@@ -1,4 +1,4 @@
-# distributed-file-system
+# DFS
 Distributed file system for video upload, storage and retrival
 
 ## File Structure
