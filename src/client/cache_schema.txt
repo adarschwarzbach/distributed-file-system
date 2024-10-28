@@ -1,0 +1,18 @@
+
+
+                    root/512_dfs_cache                                      root/512_downloaded_files
+
+            client_id.txt      uploaded_file_metadata.json                                   example_file.MOV
+
+
+
+
+
+
+
+
+uploaded_file_metadata.json: {
+    fileName_coordinatorFileID: [
+            {chunk_id, chunk_index, chunk_server_location}
+        ]
+}

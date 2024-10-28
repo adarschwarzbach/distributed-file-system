@@ -1,6 +1,8 @@
 from typing import *
 
 class CoordinatorConnection:
-    pass
+    '''
+        handle connection with coordinator
+    '''
 
 
