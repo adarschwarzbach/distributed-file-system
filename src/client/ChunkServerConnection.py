@@ -6,6 +6,7 @@ class ChunkServerConnection:
         self.chnk_srv_port = chnk_srv_port
         
 
+
     def upload_chunk(self, chunk_object):
         #ToDo: upload a given chunk to a given chunk server
         pass
@@ -13,4 +14,12 @@ class ChunkServerConnection:
     
     def download_chunk(self, chunk_id):
         #ToDo: Download a given chunk from a given chunk server
+        pass
+
+    def open_connection(self):
+        # ToDo: Open connection
+        pass
+
+    def close_connection(self):
+        # ToDo: Close connection
         pass

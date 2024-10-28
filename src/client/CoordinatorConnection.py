@@ -14,4 +14,13 @@ class CoordinatorConnection:
         # ToDo: request a unique client ID from the server
         pass
 
+    def open_connection(self):
+        # ToDo: Open connection
+        pass
+    
+    def close_connection(self):
+        # ToDo: Close connection
+        pass
+
+
 
