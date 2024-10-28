@@ -1,4 +1,6 @@
 from typing import *
 
-class UploadChunk:
+class CoordinatorConnection:
     pass
+
+

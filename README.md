@@ -1,5 +1,5 @@
 # DFS
-Distributed file system for video upload, storage and retrival
+Distributed File System (DFS) for video upload, storage and retrival
 
 ## File Structure
 

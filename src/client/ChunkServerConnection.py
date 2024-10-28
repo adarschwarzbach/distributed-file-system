@@ -1,4 +1,6 @@
 from typing import *
 
-class LocalChunker:
+class ChunkServerConnection:
     pass
+
+
