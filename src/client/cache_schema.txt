@@ -2,7 +2,7 @@
 
                     root/512_dfs_cache                                      root/512_downloaded_files
 
-            client_id.txt      uploaded_file_metadata.json                                   example_file.MOV
+            client_id.txt      uploaded_file_metadata.json                      example_file.MOV
 
 
 
