@@ -2,9 +2,12 @@ from typing import Dict, Set, List
 from coordinator.File import File
 from coordinator.ChunkServer import ChunkServer
 from coordinator.Chunk import Chunk
+import socket
+from concurrent.futures import ThreadPoolExecutor
+
 
 class Coordinator:
-    def __init__(self):
+    def __init__(self, host='localhost', port=6000, max_workers=10):
         # maps file_id to a File object
         file_map: Dict[int, File] = {}
         # maps chunk_id to the 3 ChunkServers where we can find that chunk
@@ -12,10 +15,36 @@ class Coordinator:
         # set of ChunkServers that are online
         active_chunkservers: Set[ChunkServer] = set()
 
+        # Networking & threading
+        self.host = host
+        self.port = port
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #IPv4 over TCP
+        self.server_socket.bind((self.host, self.port)) # Tells OS port is taken for incoming connections
+        self.server_socket.listen(5) # Up to 5 concurrent connections, after 5, requests are queued
+        self.executor = ThreadPoolExecutor(max_workers=max_workers) # create a managed thread pool
+
     def start(self):
         '''
         Start the Coordinator
         '''
+        while True:
+            client_socket, addr = self.server_socket.accept()
+            print(f"connected to {addr}")
+            self.executor.submit(self.handle_request, client_socket)
+
+
+    def handle_request(self, client_socket):
+        try: 
+            request = client_socket.recv(1024).decode()
+            # ToDo: Route request to relevant function (get metadat, get id, etc. )
+        except Exception as e:
+            print(f"Error handling request: {e}")
+        
+        finally:
+            client_socket.close() # use this to close connction once finished 
+
+
+
 
     def check_active_servers(self):
         '''

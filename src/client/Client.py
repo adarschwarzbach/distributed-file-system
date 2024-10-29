@@ -7,16 +7,22 @@ from CoordinatorConnection import CoordinatorConnection
 
 class Client:
 
-    def __init__(self):
+    def __init__(self, host='localhost', port=5000):
         self.cache_path = Path.home() / './512_dfs_cache'
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
         self.file_metadata = self.load_metadata() # get clients file information
         self.id = self.get_client_id() # get or create client ID
 
+        #Networking
+        self.host = host
+        self.port = port
+
+
     
     def start(self):
         # ToDo: Main loop to upload and download files until end
         pass
+
 
     def load_metadata(self):
         # Load cached metadata on file/chunk locations

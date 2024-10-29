@@ -6,12 +6,9 @@ Distributed File System (DFS) for video upload, storage and retrival
 ```sh
 distributed-file-system/
 ├── src/
-│   ├── __init__.py
 │   ├── client/        # upload and retrieve files
-│   │   ├── __init__.py
 │   │   └── client.py
 │   ├── coordinator/   # manage servers and file replication
-│   │   ├── __init__.py
 │   │   └── coordinator.py
 │   ├── chunk_server/  # store and serve chunks
 │   │   ├── __init__.py
