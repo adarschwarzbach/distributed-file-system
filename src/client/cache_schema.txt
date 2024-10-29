@@ -13,6 +13,6 @@
 
 uploaded_file_metadata.json: {
     fileName_coordinatorFileID: [
-            {chunk_id, chunk_index, chunk_server_location}
+            {chunk_id, chunk_index, set(chunk_server_locations)}
         ]
 }
