@@ -12,7 +12,7 @@ class DownloadManager:
     def __init__(self, file_id):
         self.file_id = file_id
     
-    def download_chunks(self):
+    def download_file(self):
         # ToDo: download chunks in parallel 
         pass
 
