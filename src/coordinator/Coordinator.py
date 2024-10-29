@@ -1,9 +1,10 @@
 from typing import Dict, Set, List
-from coordinator.File import File
-from coordinator.ChunkServer import ChunkServer
-from coordinator.Chunk import Chunk
+from src.coordinator.File import File
+from src.coordinator.ChunkServer import ChunkServer
+from src.coordinator.Chunk import Chunk
 import socket
 from concurrent.futures import ThreadPoolExecutor
+import uuid 
 
 
 class Coordinator:
@@ -36,7 +37,10 @@ class Coordinator:
     def handle_request(self, client_socket):
         try: 
             request = client_socket.recv(1024).decode()
-            # ToDo: Route request to relevant function (get metadat, get id, etc. )
+            print(f"Recieved request: {request}")
+            if request == "GET_CLIENT_ID":
+                self.handle_get_client_id(client_socket)
+
         except Exception as e:
             print(f"Error handling request: {e}")
         
@@ -44,6 +48,13 @@ class Coordinator:
             client_socket.close() # use this to close connction once finished 
 
 
+    def handle_get_client_id(self, client_socket):
+        """Generate a new UUID client ID and send it back to client"""
+        #ToDo: Cache client and their ID somehow and write it to log
+
+        client_id = str(uuid.uuid4())
+        client_socket.send(client_id.encode())
+        print(f"Generated and sent client ID: {client_id}")
 
 
     def check_active_servers(self):
