@@ -38,7 +38,7 @@ class Client:
         if client_id_file.exists():
             with open(client_id_file, 'r') as file:
                 client_id = file.read().strip()
-                print(f"Loaded client id from cache")
+                print(f"Loaded client id {client_id} from cache")
                 return client_id
 
         else:

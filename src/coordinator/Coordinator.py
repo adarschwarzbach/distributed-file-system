@@ -5,6 +5,7 @@ from src.coordinator.Chunk import Chunk
 import socket
 from concurrent.futures import ThreadPoolExecutor
 import uuid 
+import json
 
 
 class Coordinator:
@@ -36,10 +37,15 @@ class Coordinator:
 
     def handle_request(self, client_socket):
         try: 
-            request = client_socket.recv(1024).decode()
-            print(f"Recieved request: {request}")
-            if request == "GET_CLIENT_ID":
+            data = client_socket.recv(1024).decode()
+            request = json.loads(data)  # Parse JSON request
+            print(f"Received request: {request}")
+            if request.get("request_type") == "GET_CLIENT_ID":
                 self.handle_get_client_id(client_socket)
+
+            # Handle other request types below
+        except json.JSONDecodeError:
+            print("Invalid JSON received")
 
         except Exception as e:
             print(f"Error handling request: {e}")
@@ -53,7 +59,8 @@ class Coordinator:
         #ToDo: Cache client and their ID somehow and write it to log
 
         client_id = str(uuid.uuid4())
-        client_socket.send(client_id.encode())
+        response = {"client_id": client_id}
+        client_socket.sendall(json.dumps(response).encode())
         print(f"Generated and sent client ID: {client_id}")
 
 
