@@ -1,7 +1,7 @@
 from typing import Dict, Set, List
-from File import File
-from ChunkServer import ChunkServer
-from Chunk import Chunk
+from coordinator.File import File
+from coordinator.ChunkServer import ChunkServer
+from coordinator.Chunk import Chunk
 
 class Coordinator:
     def __init__(self):
