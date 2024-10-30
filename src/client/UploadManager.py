@@ -10,22 +10,22 @@ from src.client.ChunkServerConnection import ChunkServerConnection
 class UploadManager:
     '''Read, chunk and upload file''' 
     
-    def __init__(self, coordinator_connection: CoordinatorConnection, user_id):
+    def __init__(self, coordinator_connection: CoordinatorConnection, user_id, max_workers=10):
+        self.max_workers = 10
+        self.user_id = user_id
         self.chunk_server_map = {}
         self.coordinator_connection = coordinator_connection
         self.cache_path = Path.home() / '512_dfs_cache'
         self.cache_path.mkdir(parents=True, exist_ok=True)
 
+
+    def upload_file(self, file_location, chunk_size_mb, file_id):
         chunk_server_info = self.coordinator_connection.get_chunk_servers() # form [{chnk_srv_addr, chnk_srv_port, chnk_srv_id}, ...]
         self.chunk_servers = [
-            ChunkServerConnection(user_id, server['chnk_srv_addr'], server['chnk_srv_port'], server['chnk_srv_id'])
+            ChunkServerConnection(self.user_id, server['chnk_srv_addr'], server['chnk_srv_port'], server['chnk_srv_id'])
             for server in chunk_server_info
         ]
 
-        
-    
-    # Need to abstract this into upload manager
-    def upload_file(self, file_location, chunk_size_mb, file_id):
         chunk_size_bytes = chunk_size_mb * 1024 * 1024
         futures = []
         all_success = True  
