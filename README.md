@@ -22,7 +22,7 @@ distributed-file-system/
 # API Documentation
 
 ## Overview
-This document specifies the API structure for the `Coordinator` server and `Chunk Server` based on the `Client`, `UploadManager`, and `DownloadManager` classes. It includes the exact inputs and expected outputs, matching the structure in the provided code.
+This document specifies the API structure and return object for the `Coordinator` server and `Chunk Server` based on the `Client`, `UploadManager`, and `DownloadManager` classes. 
 
 ---
 
@@ -192,7 +192,3 @@ This document specifies the API structure for the `Coordinator` server and `Chun
 1. The client retrieves `GET_CHUNK_LOCATIONS` to determine where each chunk of the requested file is located.
 2. The client iterates through each chunk's servers and initiates `DOWNLOAD_CHUNK` requests.
 3. Upon successful download of all chunks, the client reassembles the file based on `chunk_index`.
-
----
-
-This documentation provides detailed input and output expectations for both the Coordinator and Chunk Server APIs, ensuring consistent communication across components in the distributed file system.
