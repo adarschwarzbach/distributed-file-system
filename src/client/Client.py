@@ -1,9 +1,11 @@
 from typing import *
-import os
+import time
 from pathlib import Path
 import json
 
 from src.client.CoordinatorConnection import CoordinatorConnection
+from src.client.UploadManager import UploadManager
+from src.client.DownloadManager import DownloadManager
 
 class Client:
     def __init__(self, coordinator_host, coordinator_port):
@@ -15,11 +17,32 @@ class Client:
         self.coordinator_connection = CoordinatorConnection(coordinator_host, coordinator_port)
         self.id = self.get_client_id() # get or create client ID
 
+        self.upload_manager = UploadManager(self.coordinator_connection, self.id)
+        self.download_manager = DownloadManager(self.coordinator_connection, self.id)
+
 
     
     def start(self):
-        # ToDo: Main loop to upload and download files until end
-        pass
+        print("Would you like to (1) upload a file or (2) download a file?")
+        choice = input("Enter 1 to upload or 2 to download: ").strip()
+
+        if choice == '1':
+            file_location = input("Please enter the file location to upload: ").strip()
+            if not Path(file_location).is_file():
+                print("The specified file does not exist. Please check the path and try again.")
+                return
+            
+            self.upload_manager.upload_file(file_location, 1, f"{file_location}_{time.time()}")
+
+        elif choice == '2':
+            # Prompt for file ID to download
+            file_id = input("Please enter the file ID to download: ").strip()
+            # Proceed to download
+            self.download_manager.download_file(file_id)
+
+        else:
+            print("Invalid input. Please enter 1 or 2 to proceed.")
+            self.start()  # Retry if input is invalid
 
 
     def load_metadata(self) -> Optional[dict]:

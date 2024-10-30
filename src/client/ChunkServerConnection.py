@@ -2,7 +2,6 @@ from typing import *
 import socket
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import uuid
 import time
 
 class ChunkServerConnection:
@@ -14,42 +13,6 @@ class ChunkServerConnection:
         self.max_workers = max_workers
         self.max_retries = max_retries
         
-
-    # Need to abstract this into upload manager
-    def chunk_file(self, file_location, chunk_size_mb, file_id):
-        chunk_size_bytes = chunk_size_mb * 1024 * 1024
-        futures = []
-        all_success = True  
-
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            with open(file_location, 'rb') as file:
-                chunk_index = 0
-
-                while True:
-                    chunk = file.read(chunk_size_bytes)
-                    chunk_id = f"{file_id}_{uuid.uuid4()}"
-                    if not chunk:
-                        break
-
-                    future = executor.submit(self.upload_chunk, chunk_id, chunk, chunk_index)
-                    futures.append(future)
-
-                    chunk_index += 1
-
-
-            for future in as_completed(futures):
-                success = future.result()
-                if not success:
-                    print("One or more chunks failed to upload after retries.")
-                    all_success = False
-
-        if all_success:
-            print(f"File {file_id} uploaded successfully in {chunk_index} chunks.")
-        else:
-            print(f"File {file_id} upload encountered errors.")
-
-        return all_success
-
 
     def upload_chunk(self, chunk_id, chunk_object, chunk_index) -> bool:
         attempt = 0
