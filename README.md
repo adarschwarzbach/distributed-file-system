@@ -7,15 +7,14 @@ Distributed File System (DFS) for video upload, storage and retrival
 distributed-file-system/
 ├── src/
 │   ├── client/        # upload and retrieve files
-│   │   └── client.py
+│   │   └── Client.py
 │   ├── coordinator/   # manage servers and file replication
-│   │   └── coordinator.py
+│   │   └── Coordinator.py
 │   ├── chunk_server/  # store and serve chunks
-│   │   └── chunk_server.py
-│   ├── entry.py       # global entry
+│   │   └── ChunkServer.py
 │   └── cli.py         # command line interface to run a service
 ├── README.md
-└── requirements.txt
+└── entry.py           # global entry 
 ```
 
 
