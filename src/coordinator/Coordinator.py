@@ -70,7 +70,7 @@ class Coordinator:
         # TODO: make network call -> return boolean, true for valid, false for offline
         valid = True # just placeholder for now
         if not valid:
-            self.active_chunkservers.remove(chunk_server)
+            del self.active_chunkservers[chunk_server]
             self.handle_chunk_server_failure()
 
     def check_active_servers(self):
@@ -93,6 +93,7 @@ class Coordinator:
         handle request for a new ChunkServer to join
         '''
         # TODO: network call to connect chunk server
+        self.active_chunkservers[new_server] = 0
         pass
 
     def remove_chunk_server(self, server_to_remove: ChunkServer):
@@ -101,7 +102,7 @@ class Coordinator:
         '''
         for chunk in server_to_remove.chunks:
             self.remap_chunk(chunk)
-        self.active_chunkservers.remove(server_to_remove)
+        del self.active_chunkservers[server_to_remove]
 
     def handle_new_file(self, new_file: File):
         '''
@@ -112,7 +113,7 @@ class Coordinator:
 
     def get_least_loaded_chunk_servers(self):
         count_to_chunk_server = sorted([(count, chunk_server) for chunk_server, count in self.active_chunkservers])[:max(len(self.active_chunkservers), 3)]
-        return count_to_chunk_server
+        return [server for _, server in count_to_chunk_server]
 
     def map_chunk_to_chunk_servers(self, chunk: Chunk):
         '''
@@ -122,6 +123,7 @@ class Coordinator:
         chunk_servers = self.get_least_loaded_chunk_servers()
         for chunk_server in chunk_servers:
             # TODO: make calls to chunk_server to add chunk to that chunk_server
+            self.active_chunkservers[chunk_server] += 1
             pass
 
     def remap_chunk(self, chunk: Chunk):
@@ -140,4 +142,5 @@ class Coordinator:
             for chunk_server in self.chunk_map[chunk_id]:
                 # TODO: check is chunk_server is alive if so:
                 # TODO: send request to chunk_server to delete chunk with chunk_id
+                self.active_chunkservers[chunk_server] -= 1
                 pass
