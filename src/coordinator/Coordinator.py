@@ -43,7 +43,7 @@ class Coordinator:
             if request.get("request_type") == "GET_CLIENT_ID":
                 self.handle_get_client_id(client_socket)
             # Handle other request types below
-            elif request.get("request_type") == "GET_CHUNK_SERVERS":
+            elif request.get("request_type") == "ADD_CHUNK_SERVER":
                 self.handle_add_chunk_server(request.get("chunk_server"))
             elif request.get("request_type") == "GET_CHUNK_LOCATIONS":
                 self.handle_get_chunk_locations
@@ -92,9 +92,15 @@ class Coordinator:
         makes network call to check if chunk_server is offline
         '''
         try: 
-            with socket.create_connection((chunk_server.host, chunk_server.port), timeout=5):
-                return True
-        except Exception:
+            with socket.create_connection((chunk_server.host, chunk_server.port), timeout=5) as conn:
+                health_check_request = json.dumps({"request_type": "HEALTH_CHECK"})
+                conn.sendall(health_check_request.encode())
+                response = conn.recv(1024).decode()
+                response_data = json.loads(response)
+                return response_data.get("status") == "OK"
+
+        except Exception as e:
+            print(f'Health check for chunkserver failed: {e}')
             return False
 
     def check_active_servers(self):
