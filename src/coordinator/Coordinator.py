@@ -1,7 +1,7 @@
 from typing import Dict, Set, List
 from src.coordinator.File import File
-from src.coordinator.ChunkServer import ChunkServer
-from src.coordinator.Chunk import Chunk
+from src.chunk_server.ChunkServer import ChunkServer
+from src.chunk_server.Chunk import Chunk
 import socket
 from concurrent.futures import ThreadPoolExecutor
 import uuid 
@@ -43,7 +43,7 @@ class Coordinator:
             if request.get("request_type") == "GET_CLIENT_ID":
                 self.handle_get_client_id(client_socket)
             # Handle other request types below
-            elif request.get("request_type") == "ADD_CHUNK_SERVER":
+            elif request.get("request_type") == "GET_CHUNK_SERVER":
                 self.handle_add_chunk_server(request.get("chunk_server"))
             elif request.get("request_type") == "NEW_FILE":
                 new_file = request.get("file")
@@ -147,7 +147,7 @@ class Coordinator:
         chunk_servers = self.get_least_loaded_chunk_servers()
         self.chunk_map[chunk.id] = chunk_servers
         for chunk_server in chunk_servers:
-            chunk_server.add_chunk(chunk)
+            chunk_server.upload_chunk(chunk)
             self.active_chunkservers[chunk_server] += 1
         print(f"Chunk {chunk.id} mapped to servers: {chunk_servers}")
 
