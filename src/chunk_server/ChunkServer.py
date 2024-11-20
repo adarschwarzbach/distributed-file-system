@@ -5,10 +5,10 @@ import os
 
 
 class ChunkServer:
-    def __init__(self, host='localhost', port=6000, max_workers=10):
+    def __init__(self, id, host='localhost', port=6000, max_workers=10):
         
         self.chunk_map = {} #map chunk_ids to file paths
-
+        self.id = id
         # Networking & threading
         self.host = host
         self.port = port
