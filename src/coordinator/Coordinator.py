@@ -43,7 +43,7 @@ class Coordinator:
             if request.get("request_type") == "GET_CLIENT_ID":
                 self.handle_get_client_id(client_socket)
             # Handle other request types below
-            elif request.get("request_type") == "ADD_CHUNK_SERVER":
+            elif request.get("request_type") == "GET_CHUNK_SERVERS":
                 self.handle_add_chunk_server(request.get("chunk_server"))
             elif request.get("request_type") == "GET_CHUNK_LOCATIONS":
                 self.handle_get_chunk_locations
@@ -123,14 +123,35 @@ class Coordinator:
             self.remap_chunk(chunk)
         del self.active_chunkservers[failed_server]
 
-    def handle_add_chunk_server(self, new_server: ChunkServer):
-        '''
-        handle request for a new ChunkServer to join
-        '''
-        # TODO: network call to connect chunk server
-        # !!!!!!
-        self.active_chunkservers[new_server] = 0
-        pass
+    def handle_add_chunk_server(self, client_socket, request):
+        try:
+            chunk_server_data = request.get("chunk_server")
+            if not chunk_server_data:
+                raise ValueError("Missing chunk server data")
+
+            new_server = ChunkServer(
+                id=chunk_server_data['id'],
+                chunks=[],  # Assuming starting with no chunks
+                host=chunk_server_data['host'],
+                port=chunk_server_data['port']
+            )
+
+            self.active_chunkservers[new_server] = 0
+
+            response = {"status": "success", "message": "Chunk server successfully added"}
+            client_socket.sendall(json.dumps(response).encode())
+            self.log_info(f"New chunk server {new_server.id} added successfully.")
+
+        except ValueError as e:
+            response = {"status": "error", "message": str(e)}
+            client_socket.sendall(json.dumps(response).encode())
+            self.log_error(f"Failed to add chunk server: {e}")
+
+        except Exception as e:
+            response = {"status": "error", "message": "Failed to register chunk server"}
+            client_socket.sendall(json.dumps(response).encode())
+            self.log_error(f"Unexpected error when adding chunk server: {e}")
+
 
     def remove_chunk_server(self, server_to_remove: ChunkServer):
         '''
