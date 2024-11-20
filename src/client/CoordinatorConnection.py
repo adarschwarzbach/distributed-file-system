@@ -94,5 +94,27 @@ class CoordinatorConnection:
             print(f"Error getting Chunk Servers: {e}")
             return []
 
+    def register_new_file(self, file_info):
+        request = {
+            "request_type": "NEW_FILE",
+            "file": file_info  # This should include necessary file metadata
+        }
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((self.coord_addr, self.coord_port))
+            s.sendall(json.dumps(request).encode())
+            response_data = s.recv(1024).decode()
+            response = json.loads(response_data)
+            return response
+    
+    def delete_file(self, file_id):
+        request = {
+            "request_type": "DELETE_FILE",
+            "file_id": file_id
+        }
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((self.coord_addr, self.coord_port))
+            s.sendall(json.dumps(request).encode())
+            response_data = s.recv(1024).decode()
+            response = json.loads(response_data)
+            return response
         
-
