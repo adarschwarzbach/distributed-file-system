@@ -78,9 +78,15 @@ class Coordinator:
         makes network call to check if chunk_server is offline
         '''
         try: 
-            with socket.create_connection((chunk_server.host, chunk_server.port), timeout=5):
-                return True
-        except Exception:
+            with socket.create_connection((chunk_server.host, chunk_server.port), timeout=5) as conn:
+                health_check_request = json.dumps({"request_type": "HEALTH_CHECK"})
+                conn.sendall(health_check_request.encode())
+                response = conn.recv(1024).decode()
+                response_data = json.loads(response)
+                return response_data.get("status") == "OK"
+
+        except Exception as e:
+            print(f'Health check for chunkserver failed: {e}')
             return False
 
     def check_active_servers(self):
