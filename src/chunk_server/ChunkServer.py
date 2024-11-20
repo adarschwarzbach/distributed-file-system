@@ -58,15 +58,15 @@ class ChunkServer:
             metadata = client_socket.recv(1024).decode()
             metadata = json.loads(metadata)
 
-            file_name = metadata.get("file_name")  
+            chunk_id = metadata.get("chunk_id")  
             chunk_size = metadata.get("chunk_size") 
 
-            if not file_name or not chunk_size:
+            if not chunk_id or not chunk_size:
                 raise ValueError("Invalid metadata received.")
 
-            print(f"Receiving chunk for file {file_name} (Size: {chunk_size} bytes)")
+            print(f"Receiving chunk of chunk_id: {chunk_id} (Size: {chunk_size} bytes)")
 
-            file_path = f"./chunks/{file_name}"
+            file_path = f"./chunks/{chunk_id}"
 
             # Ensure the chunks directory exists
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -85,10 +85,10 @@ class ChunkServer:
                 raise ValueError("Incomplete data received.")
 
             # Update the chunk map
-            self.chunk_map[file_name] = file_path
+            self.chunk_map[chunk_id] = file_path
 
-            print(f"Chunk for file {file_name} saved successfully at {file_path}.")
-            client_socket.send(json.dumps({"status": "SUCCESS", "file_name": file_name, "file_path": file_path}).encode())
+            print(f"Chunk for chunk_id {chunk_id} saved successfully at {file_path}.")
+            client_socket.send(json.dumps({"status": "SUCCESS"}).encode())
 
         except Exception as e:
             print(f"Error uploading chunk: {e}")
@@ -96,6 +96,7 @@ class ChunkServer:
             
 
     def download_chunk(self, client_socket):
+
         pass
     
     def respond_health_check(self, client_socket):
