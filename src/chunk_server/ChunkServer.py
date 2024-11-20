@@ -96,7 +96,32 @@ class ChunkServer:
             
 
     def download_chunk(self, client_socket):
+        try:
+            metadata = client_socket.recv(1024).decode()
+            metadata = json.loads(metadata)
 
+            chunk_id = metadata.get("chunk_id")  
+            file_path = self.chunk_map[chunk_id]
+
+            if not file_path or not os.path.exists(file_path):
+                raise ValueError(f"Chunk with ID {chunk_id} not found.")
+
+            print(f"Sending chunk with ID {chunk_id} from {file_path}")
+
+            with open(file_path, "rb") as chunk_file:
+                while True:
+                    buffer = chunk_file.read(1024)  # Read in 1024-byte chunks
+                    if not buffer:
+                        break
+                    client_socket.send(buffer)
+
+            print(f"Chunk with ID {chunk_id} sent successfully.")
+            client_socket.send(json.dumps({"status": "SUCCESS", "chunk_id": chunk_id}).encode())
+
+
+        except Exception as e:
+            print(f"Error downloading chunk: {e}")
+            client_socket.send(json.dumps({"status": "FAILURE", "error": str(e)}).encode()) 
         pass
     
     def respond_health_check(self, client_socket):
