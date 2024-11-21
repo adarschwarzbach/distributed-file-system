@@ -21,7 +21,7 @@ class DownloadManager:
     
     def download_file(self, file_id):
         chunk_server_info = self.coordinator_connection.get_chunk_locations(file_id) # form [ {chunk_id:[{chnk_srv_addr, chnk_srv_port, chnk_srv_id,}, {replica_2}, {replica_3}], ...]
-
+        print(chunk_server_info)
         metadata_file = self.cache_path / f"{file_id}_metadata.json"
         if not metadata_file.is_file():
             print(f"Metadata file {metadata_file} does not exist.")

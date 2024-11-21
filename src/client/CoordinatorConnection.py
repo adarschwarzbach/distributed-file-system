@@ -64,15 +64,16 @@ class CoordinatorConnection:
     
 
     def get_chunk_locations(self, file_id):
-        """Get a list of Chunk Servers holding pieces of the file"""
+        """Get the raw JSON object of Chunk Servers holding pieces of the file"""
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((self.coord_addr, self.coord_port))
-                request = {"request_type": "GET_CHUNK_SERVERS", "file_id": file_id}
-                s.sendall(json.dumps(request).encode())
-                print("Requested Chunklocations from Coordinator")
-                print("request:", request)
-                # Collect response data until we reach the end of the message
+                request = {"request_type": "GET_FILE_DATA", "file_id": file_id}
+                s.sendall((json.dumps(request) + "\n\n").encode())  # Add delimiter
+                print("Requested Chunk locations from Coordinator")
+                print("Request:", request)
+
+                # Buffer to collect response data
                 data = ""
                 while True:
                     part = s.recv(1024).decode()
@@ -80,32 +81,18 @@ class CoordinatorConnection:
                         break
                     data += part
                     if "\n\n" in data:  # End of message
+                        data = data.replace("\n\n", "")  # Remove delimiter
                         break
 
-                print(json.loads(data))
+                response = json.loads(data)  # Parse the raw JSON response
+                print("Raw Response:", response)
 
-                response = json.loads(data)
-                # chunk_servers = response.get("chunk_locations", [])  # form [ {chunk_id:[{chnk_srv_addr, chnk_srv_port, chnk_srv_id,}, {replica_2}, {replica_3}], ...]
-                
-                chunk_servers = []
-
-                for raw_obj in response['chunk_servers']:
-                    chunk_server_info = json.loads(raw_obj)
-                    addr = chunk_server_info['chnk_srv_addr']
-                    port = chunk_server_info['chnk_srv_port']
-                    server_id = chunk_server_info['chnk_srv_id']
-                    chunk_servers.append((addr, port, server_id))
-
-                print(chunk_servers)                
-
-                if not chunk_servers:
-                    print("No Chunk Servers available from Coordinator.")
-
-                return chunk_servers
+                return response  # Return the raw JSON object directly
 
         except Exception as e:
-            print(f"Error getting Chunk Servers: {e}")
-            return []
+            print(f"Error getting chunk locations: {e}")
+            return None
+
 
     def register_new_file(self, file_id, chunk_metadata):
         req = {
