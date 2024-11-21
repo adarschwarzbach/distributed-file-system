@@ -52,13 +52,13 @@ class Coordinator:
             elif request.get('request_type') == 'REGISTER_NEW_FILE':
                 self.handle_creating_new_file(request)
             # ToDo
-            elif request.get("request_type") == "ADD_NEW_CHUNK_SERVER":
+            elif request.get("request_type") == "REGISTER_CHUNK_SERVER":
                 # Do parsing of request for data here
-                self.handle_new_chunk_server() # determine what data is passed here
+                self.handle_new_chunk_server(request) # determine what data is passed here
+            elif request.get('request_type') == 'GET_CHUNK_SERVERS':
+                self.handle_getting_chunk_servers(client_socket)
 
-            #
-            if request.get("request_type") == "":
-                self.handle_new_chunk_server() # determine what data is passed here
+ 
 
 
             # Handle other request types below
@@ -71,9 +71,22 @@ class Coordinator:
         finally:
             client_socket.close() # use this to close connction once finished 
 
+    def handle_getting_chunk_servers(self, client_socket):
+        chunk_servers = []
+        for _, chunk_server_abstraction in self.chunk_server_map:
+            chunk_servers.append(chunk_server_abstraction)
+        response = {
+            'chunk_servers': chunk_servers
+        }
+        response_data = json.dumps(response) + '\n\n'
+        client_socket.sendall(response_data.encode())
+        print(f"Returned chunk servers to client")
+
+        pass
+
     def handle_creating_new_file(self, request):
-        file_id = request.file_id
-        chunk_metadata = request.chunk_metadata
+        file_id = request.get('file_id')
+        chunk_metadata = request.get('chunk_metadata')
         chunk_ids = [chunk["chunk_id"] for chunk in chunk_metadata]
 
         #store file
@@ -104,40 +117,35 @@ class Coordinator:
         '''
         pass
 
-    def handle_chunk_server_failure(self, failed_server: ChunkServer):
+    def handle_chunk_server_failure(self, failed_server):
         '''
         if a ChunkServer goes offline unexpectedly, map all the chunks it stored to another ChunkServer,
         call self.remap_chunk()
         '''
         pass
 
-
-    def handle_new_chunk_server(self, new_server: ChunkServer):
-        '''
-        handle request for a new ChunkServer to join
-        '''
+    def handle_new_chunk_server(self, request):
+        id = request.get('chunk_server_id')
+        address = request.get('host')
+        port = request.get('port')
+        self.chunk_server_map[id] = ChunkServerAbstraction(address, port, id)
         pass
 
 
-    def remove_chunk_server(self, server_to_remove: ChunkServer):
+    def remove_chunk_server(self, server_to_remove):
         '''
         handle request for ChunkServer to leave
         '''
         pass
     
 
-    def handle_new_file(self, new_file: File):
-        '''
-        handle request when a client stores a new file, call self.map_new_chunk_to_chunk_servers() for each chunk
-        '''
-
-    def map_chunk_to_chunk_servers(self, chunk: Chunk):
+    def map_chunk_to_chunk_servers(self, chunk):
         '''
         map each new chunk to 3 chunkservers
         '''
         pass
 
-    def remap_chunk(self, chunk: Chunk):
+    def remap_chunk(self, chunk):
         '''
         remaps chunk to another ChunkServer, called when ChunkServer goes offline
         '''
