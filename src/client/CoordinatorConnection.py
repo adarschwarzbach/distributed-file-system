@@ -68,24 +68,36 @@ class CoordinatorConnection:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((self.coord_addr, self.coord_port))
-                request = {"request_type": "GET_CHUNK_LOCATIONS", "file_id": file_id}
+                request = {"request_type": "GET_CHUNK_SERVERS", "file_id": file_id}
                 s.sendall(json.dumps(request).encode())
                 print("Requested Chunklocations from Coordinator")
-
+                print("request:", request)
                 # Collect response data until we reach the end of the message
                 data = ""
                 while True:
                     part = s.recv(1024).decode()
-                    if not part:
+                    if not part:  # Connection closed
                         break
                     data += part
-                    if "\n\n" in data:
-                        data = data.replace("\n\n", "")
+                    if "\n\n" in data:  # End of message
                         break
 
+                print(json.loads(data))
+
                 response = json.loads(data)
-                chunk_servers = response.get("chunk_locations", [])  # form [ {chunk_id:[{chnk_srv_addr, chnk_srv_port, chnk_srv_id,}, {replica_2}, {replica_3}], ...]
+                # chunk_servers = response.get("chunk_locations", [])  # form [ {chunk_id:[{chnk_srv_addr, chnk_srv_port, chnk_srv_id,}, {replica_2}, {replica_3}], ...]
                 
+                chunk_servers = []
+
+                for raw_obj in response['chunk_servers']:
+                    chunk_server_info = json.loads(raw_obj)
+                    addr = chunk_server_info['chnk_srv_addr']
+                    port = chunk_server_info['chnk_srv_port']
+                    server_id = chunk_server_info['chnk_srv_id']
+                    chunk_servers.append((addr, port, server_id))
+
+                print(chunk_servers)                
+
                 if not chunk_servers:
                     print("No Chunk Servers available from Coordinator.")
 

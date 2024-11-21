@@ -38,6 +38,8 @@ class DownloadManager:
             for chunk_info in chunk_metadata:
                 chunk_id = chunk_info["chunk_id"]
                 chunk_index = chunk_info["chunk_index"]
+                print(chunk_server_info, "CHUNK SERVER INFO")
+
                 servers_with_chunk = chunk_server_info.get(chunk_id, [])
 
                 # Only schedule a download if there are servers for the chunk

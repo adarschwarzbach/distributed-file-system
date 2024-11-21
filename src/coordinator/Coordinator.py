@@ -95,6 +95,7 @@ class Coordinator:
 
 
     def handle_getting_chunk_servers(self, client_socket):
+        print("chunk server info requested")
         chunk_servers = []
         for _, chunk_server_abstraction in self.chunk_server_map.items():
             chunk_servers.append(chunk_server_abstraction.to_json())
@@ -103,7 +104,7 @@ class Coordinator:
         }
         response_data = json.dumps(response) + '\n\n'
         client_socket.sendall(response_data.encode())
-        print(f"Returned chunk servers to client")
+        print(f"Returned chunk servers to client", response)
 
         pass
 
@@ -166,6 +167,7 @@ class Coordinator:
         address = request.get('host')
         port = request.get('port')
         self.chunk_server_map[id] = ChunkServerAbstraction(address, port, id)
+        print(self.chunk_server_map, "CHUNK SERVER MAP")
         pass
 
 
