@@ -43,16 +43,10 @@ class Coordinator:
             if request.get("request_type") == "GET_CLIENT_ID":
                 self.handle_get_client_id(client_socket)
             # Handle other request types below
-            elif request.get("request_type") == "GET_CHUNK_SERVERS":
-                self.handle_add_chunk_server(request.get("chunk_server"))
+            elif request.get("request_type") == "GET_CHUNK_SERVERS": #GET_CHUNK_SERVERS: 
+                self.handle_get_chunk_server(client_socket)
             elif request.get("request_type") == "GET_CHUNK_LOCATIONS":
-                self.handle_get_chunk_locations
-            elif request.get("request_type") == "NEW_FILE":
-                new_file = request.get("file")
-                self.handle_new_file(File(**new_file))
-            elif request.get("request_type") == "DELETE_FILE":
-                file_id = request.get("file_id")
-                self.handle_delete_file(file_id)
+                self.handle_get_chunk_locations(client_socket, request)
             else:
                 print("Unknown request type")
             
@@ -75,17 +69,36 @@ class Coordinator:
         client_socket.sendall(json.dumps(response).encode())
         print(f"Generated and sent client ID: {client_id}")
     
+    def handle_get_chunk_server(self, client_socket):
+        """Send a list of available chunk servers."""
+        try:
+            chunk_servers = [
+                {"id": server.id, "host": server.host, "port": server.port}
+                for server in self.active_chunkservers
+            ]
+            response = {"status": "success", "chunk_servers": chunk_servers}
+            client_socket.sendall(json.dumps(response).encode())
+            print("Sent chunk server list to client.")
+        except Exception as e:
+            response = {"status": "error", "message": str(e)}
+            client_socket.sendall(json.dumps(response).encode())
+            print(f"Error sending chunk servers: {e}")
+    
     def handle_get_chunk_locations(self, client_socket, request):
+        """Send locations of chunks for a given file."""
         file_id = request.get('file_id')
         if file_id in self.file_map:
             file = self.file_map[file_id]
-            chunk_locations = {chunk.id: [server.id for server in self.chunk_map.get(chunk.id, [])] for chunk in file.chunks}
+            chunk_locations = {
+                chunk.id: [{"id": server.id, "host": server.host, "port": server.port} for server in self.chunk_map.get(chunk.id, [])]
+                for chunk in file.chunks
+            }
             response = {"status": "success", "chunk_locations": chunk_locations}
         else:
             response = {"status": "error", "message": "File ID not found"}
         
         client_socket.sendall(json.dumps(response).encode())
-        self.log_info(f"Sent chunk locations for file ID {file_id}")
+        print(f"Sent chunk locations for file ID {file_id}")
 
     def check_active_server(self, chunk_server: ChunkServer):
         '''
@@ -123,36 +136,6 @@ class Coordinator:
             self.remap_chunk(chunk)
         del self.active_chunkservers[failed_server]
 
-    def handle_add_chunk_server(self, client_socket, request):
-        try:
-            chunk_server_data = request.get("chunk_server")
-            if not chunk_server_data:
-                raise ValueError("Missing chunk server data")
-
-            new_server = ChunkServer(
-                id=chunk_server_data['id'],
-                chunks=[],  # Assuming starting with no chunks
-                host=chunk_server_data['host'],
-                port=chunk_server_data['port']
-            )
-
-            self.active_chunkservers[new_server] = 0
-
-            response = {"status": "success", "message": "Chunk server successfully added"}
-            client_socket.sendall(json.dumps(response).encode())
-            self.log_info(f"New chunk server {new_server.id} added successfully.")
-
-        except ValueError as e:
-            response = {"status": "error", "message": str(e)}
-            client_socket.sendall(json.dumps(response).encode())
-            self.log_error(f"Failed to add chunk server: {e}")
-
-        except Exception as e:
-            response = {"status": "error", "message": "Failed to register chunk server"}
-            client_socket.sendall(json.dumps(response).encode())
-            self.log_error(f"Unexpected error when adding chunk server: {e}")
-
-
     def remove_chunk_server(self, server_to_remove: ChunkServer):
         '''
         handle request for ChunkServer to leave
@@ -166,7 +149,7 @@ class Coordinator:
         '''
         handle request when a client stores a new file, call self.map_new_chunk_to_chunk_servers() for each chunk
         '''
-        for chunk in new_file:
+        for chunk in new_file.chunks:
             self.map_chunk_to_chunk_servers(chunk)
         self.file_map[new_file.id] = new_file
         print(f"New file handled: {new_file.id}")
@@ -175,7 +158,8 @@ class Coordinator:
         sorted_servers = sorted(self.active_chunkservers.items(), key=lambda x: x[1])
         return [server for _, server in sorted_servers[:3]]
 
-    def map_chunk_to_chunk_servers(self, chunk: Chunk):
+    def map_chunk_to_chunk_servers(self, chunk: Chunk): 
+        #should just be sending client's request to the ChunkServer. Coordinator isn't passing the data itself
         '''
         map each new chunk to 3 chunkservers
         '''
@@ -198,10 +182,11 @@ class Coordinator:
         '''
         file = self.file_map[file_id_to_delete]
         for chunk in file.chunks:
-            chunk_id = chunk.id
-            for chunk_id in self.chunk_map:
-                for chunk_server in self.chunk_map[chunk_id]:
+            if chunk.id in self.chunk_map:
+                for chunk_server in self.chunk_map[chunk.id]:
                     if self.check_active_server(chunk_server):
-                        chunk_server.delete_chunk(chunk_id)
+                        chunk_server.delete_chunk(chunk.id)
                         self.active_chunkservers[chunk_server] -= 1
+                del self.chunk_map[chunk.id]
         del self.file_map[file_id_to_delete]
+        print(f"Deleted file: {file_id_to_delete}")
