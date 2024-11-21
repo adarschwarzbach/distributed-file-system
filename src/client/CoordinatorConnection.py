@@ -94,6 +94,20 @@ class CoordinatorConnection:
             print(f"Error getting Chunk Servers: {e}")
             return []
 
+    def register_new_file(self, file_id, chunk_metadata):
+        req = {
+            'request_type': 'REGISTER_NEW_FILE',
+            'file_id': file_id,
+            'chunk_metadata': chunk_metadata
+        }
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((self.coord_addr, self.coord_port))
+                s.sendall(json.dumps(req).encode())
+
+        except Exception as e:
+            print(f'Error registering new file: {e}')
+
     # def register_new_file(self, file_info):
     #     request = {
     #         "request_type": "NEW_FILE",

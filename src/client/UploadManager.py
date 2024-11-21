@@ -47,7 +47,8 @@ class UploadManager:
                     future = executor.submit(server.upload_chunk, chunk_id, chunk, chunk_index, file_id)
                     futures.append(future)
 
-                    chunk_metadata.append({"chunk_id": chunk_id, "chunk_index": chunk_index})
+                    #client is keeping track of the chunks and which chunkservers are storing them...!
+                    chunk_metadata.append({"chunk_id": chunk_id, "chunk_index": chunk_index, 'chunk_server_id': server.chunk_server_id})
 
                     chunk_index += 1
 
@@ -61,6 +62,8 @@ class UploadManager:
         if all_success:
             print(f"File {file_id} uploaded successfully in {chunk_index} chunks.")
             self.save_metadata(file_id, chunk_metadata)
+            self.coordinator_connection.register_new_file(file_id, chunk_metadata)
+
         else:
             print(f"File {file_id} upload encountered errors.")
 

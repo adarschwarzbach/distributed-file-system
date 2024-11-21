@@ -1,7 +1,6 @@
 from typing import Dict, Set, List
 from src.coordinator.File import File
-from src.coordinator.ChunkServer import ChunkServer
-from src.coordinator.Chunk import Chunk
+from src.coordinator.ChunkServerAbstraction import ChunkServerAbstraction
 import socket
 from concurrent.futures import ThreadPoolExecutor
 import uuid 
@@ -10,12 +9,14 @@ import json
 
 class Coordinator:
     def __init__(self, host='localhost', port=6000, max_workers=10):
+
+        ###   I THINK THIS COMMENTED STUFF IS ALL GARBAGE BELOW
         # maps file_id to a File object
-        self.file_map: Dict[int, File] = {}
+        #self.file_map: Dict[int, File] = {}
         # maps chunk_id to the 3 ChunkServers where we can find that chunk
-        self.chunk_map: Dict[int, List[ChunkServer]] = {}
+        #self.chunk_map: Dict[int, List[ChunkServer]] = {}
         # set of ChunkServers that are online
-        self.active_chunkservers: Set[ChunkServer] = set()
+        #self.active_chunkservers: Set[ChunkServer] = set()
 
         # Networking & threading
         self.host = host
@@ -24,6 +25,11 @@ class Coordinator:
         self.server_socket.bind((self.host, self.port)) # Tells OS port is taken for incoming connections
         self.server_socket.listen(5) # Up to 5 concurrent connections, after 5, requests are queued
         self.executor = ThreadPoolExecutor(max_workers=max_workers) # create a managed thread pool
+
+        #ben's code
+        self.chunk_server_map: Dict[int, ChunkServerAbstraction] = {} #map chunkserver id's to the address and port of the chunkserver
+        self.chunk_map: Dict[int, int] = {} #map chunk ids to chunkserver id that hosts it --> WILL NEED TO CHANGE WHEN WE ADD REPLICATION BUT GOOD STARTING POINT
+        self.file_map: Dict[int, File] = {}
 
     def start(self):
         '''
@@ -43,9 +49,10 @@ class Coordinator:
             print(f"Received request: {request}")
             if request.get("request_type") == "GET_CLIENT_ID":
                 self.handle_get_client_id(client_socket)
-
+            elif request.get('request_type') == 'REGISTER_NEW_FILE':
+                self.handle_creating_new_file(request)
             # ToDo
-            if request.get("request_type") == "ADD_NEW_CHUNK_SERVER":
+            elif request.get("request_type") == "ADD_NEW_CHUNK_SERVER":
                 # Do parsing of request for data here
                 self.handle_new_chunk_server() # determine what data is passed here
 
@@ -63,6 +70,22 @@ class Coordinator:
         
         finally:
             client_socket.close() # use this to close connction once finished 
+
+    def handle_creating_new_file(self, request):
+        file_id = request.file_id
+        chunk_metadata = request.chunk_metadata
+        chunk_ids = [chunk["chunk_id"] for chunk in chunk_metadata]
+
+        #store file
+        file = File(file_id, chunk_ids)
+        self.file_map[file_id] = file
+
+        #store where each chunk can be found
+        for chunk in chunk_metadata:
+            chunk_id, chunk_server_id = chunk['chunk_id'], chunk['chunk_server_id']
+            self.chunk_map[chunk_id] = chunk_server_id
+
+
 
 
     def handle_get_client_id(self, client_socket):

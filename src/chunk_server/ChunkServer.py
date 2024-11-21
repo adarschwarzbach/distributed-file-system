@@ -80,7 +80,7 @@ class ChunkServer:
 
             chunk_id = metadata.get("chunk_id")  
             chunk_size = metadata.get("chunk_size") 
-
+            file_id = metadata.get('file_id')
             if not chunk_id or not chunk_size:
                 raise ValueError("Invalid metadata received.")
 
@@ -109,6 +109,16 @@ class ChunkServer:
 
             print(f"Chunk for chunk_id {chunk_id} saved successfully at {file_path}.")
             client_socket.send(json.dumps({"status": "SUCCESS"}).encode())
+
+            #HAD THIS BEFORE I REALIZED I COULD UPDATE COORDINATE VIA CLIENT AFTER EVERYTHING
+            #notify coordinator that this specific chunk server stored a specific chunk for a specific file
+            #coordinator_notification = {
+            #    "request_type": "NOTIFY_COORDINATOR_OF_CHUNK_LOCATION",
+            #    'chunk_server_id': self.id,
+             #   "chunk_id": chunk_id,
+            #    'file_id': file_id
+            #    }
+           # self.coord_socket.sendall(json.dumps(coordinator_notification).encode())
 
         except Exception as e:
             print(f"Error uploading chunk: {e}")
