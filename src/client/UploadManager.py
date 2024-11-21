@@ -44,7 +44,7 @@ class UploadManager:
                     chunk_id = f"{file_id}_{uuid.uuid4()}"
                     server = self.chunk_servers[chunk_index % server_count]
 
-                    future = executor.submit(server.upload_chunk, chunk_id, chunk, chunk_index)
+                    future = executor.submit(server.upload_chunk, chunk_id, chunk, chunk_index, file_id)
                     futures.append(future)
 
                     chunk_metadata.append({"chunk_id": chunk_id, "chunk_index": chunk_index})

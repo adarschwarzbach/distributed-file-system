@@ -1,7 +1,7 @@
 from typing import Dict, Set, List
 from src.coordinator.File import File
-from src.chunk_server.ChunkServer import ChunkServer
-from src.chunk_server.Chunk import Chunk
+from src.coordinator.ChunkServer import ChunkServer
+from src.coordinator.Chunk import Chunk
 import socket
 from concurrent.futures import ThreadPoolExecutor
 import uuid 
@@ -14,8 +14,8 @@ class Coordinator:
         self.file_map: Dict[int, File] = {}
         # maps chunk_id to the 3 ChunkServers where we can find that chunk
         self.chunk_map: Dict[int, List[ChunkServer]] = {}
-        # dict of ChunkServers that are online mapping to the number of chunks on that chunk server
-        self.active_chunkservers: Dict[ChunkServer, int] = {}
+        # set of ChunkServers that are online
+        self.active_chunkservers: Set[ChunkServer] = set()
 
         # Networking & threading
         self.host = host
@@ -35,6 +35,7 @@ class Coordinator:
             self.executor.submit(self.handle_request, client_socket)
 
 
+
     def handle_request(self, client_socket):
         try: 
             data = client_socket.recv(1024).decode()
@@ -42,14 +43,18 @@ class Coordinator:
             print(f"Received request: {request}")
             if request.get("request_type") == "GET_CLIENT_ID":
                 self.handle_get_client_id(client_socket)
+
+            # ToDo
+            if request.get("request_type") == "ADD_NEW_CHUNK_SERVER":
+                # Do parsing of request for data here
+                self.handle_new_chunk_server() # determine what data is passed here
+
+            #
+            if request.get("request_type") == "":
+                self.handle_new_chunk_server() # determine what data is passed here
+
+
             # Handle other request types below
-            elif request.get("request_type") == "GET_CHUNK_SERVERS": #GET_CHUNK_SERVERS: 
-                self.handle_get_chunk_server(client_socket)
-            elif request.get("request_type") == "GET_CHUNK_LOCATIONS":
-                self.handle_get_chunk_locations(client_socket, request)
-            else:
-                print("Unknown request type")
-            
         except json.JSONDecodeError:
             print("Invalid JSON received")
 
@@ -68,125 +73,53 @@ class Coordinator:
         response = {"client_id": client_id}
         client_socket.sendall(json.dumps(response).encode())
         print(f"Generated and sent client ID: {client_id}")
-    
-    def handle_get_chunk_server(self, client_socket):
-        """Send a list of available chunk servers."""
-        try:
-            chunk_servers = [
-                {"id": server.id, "host": server.host, "port": server.port}
-                for server in self.active_chunkservers
-            ]
-            response = {"status": "success", "chunk_servers": chunk_servers}
-            client_socket.sendall(json.dumps(response).encode())
-            print("Sent chunk server list to client.")
-        except Exception as e:
-            response = {"status": "error", "message": str(e)}
-            client_socket.sendall(json.dumps(response).encode())
-            print(f"Error sending chunk servers: {e}")
-    
-    def handle_get_chunk_locations(self, client_socket, request):
-        """Send locations of chunks for a given file."""
-        file_id = request.get('file_id')
-        if file_id in self.file_map:
-            file = self.file_map[file_id]
-            chunk_locations = {
-                chunk.id: [{"id": server.id, "host": server.host, "port": server.port} for server in self.chunk_map.get(chunk.id, [])]
-                for chunk in file.chunks
-            }
-            response = {"status": "success", "chunk_locations": chunk_locations}
-        else:
-            response = {"status": "error", "message": "File ID not found"}
-        
-        client_socket.sendall(json.dumps(response).encode())
-        print(f"Sent chunk locations for file ID {file_id}")
 
-    def check_active_server(self, chunk_server: ChunkServer):
-        '''
-        makes network call to check if chunk_server is offline
-        '''
-        try: 
-            with socket.create_connection((chunk_server.host, chunk_server.port), timeout=5) as conn:
-                health_check_request = json.dumps({"request_type": "HEALTH_CHECK"})
-                conn.sendall(health_check_request.encode())
-                response = conn.recv(1024).decode()
-                response_data = json.loads(response)
-                return response_data.get("status") == "OK"
-
-        except Exception as e:
-            print(f'Health check for chunkserver failed: {e}')
-            return False
 
     def check_active_servers(self):
         '''
         go through self.active_chunkservers to see if any have gone offline unexpectedly
         '''
-        offline_servers = []
-        for chunk_server in list(self.active_chunkservers):
-            if not self.check_active_server(chunk_server):
-                offline_servers.append(chunk_server)
-        for server in offline_servers:
-            self.handle_chunk_server_failure(server)
+        pass
 
     def handle_chunk_server_failure(self, failed_server: ChunkServer):
         '''
         if a ChunkServer goes offline unexpectedly, map all the chunks it stored to another ChunkServer,
         call self.remap_chunk()
         '''
-        for chunk in failed_server.chunks:
-            self.remap_chunk(chunk)
-        del self.active_chunkservers[failed_server]
+        pass
+
+
+    def handle_new_chunk_server(self, new_server: ChunkServer):
+        '''
+        handle request for a new ChunkServer to join
+        '''
+        pass
+
 
     def remove_chunk_server(self, server_to_remove: ChunkServer):
         '''
         handle request for ChunkServer to leave
         '''
-        for chunk in server_to_remove.chunks:
-            self.remap_chunk(chunk)
-        del self.active_chunkservers[server_to_remove]
-        print(f"Removed chunk server: {server_to_remove}")
+        pass
+    
 
     def handle_new_file(self, new_file: File):
         '''
         handle request when a client stores a new file, call self.map_new_chunk_to_chunk_servers() for each chunk
         '''
-        for chunk in new_file.chunks:
-            self.map_chunk_to_chunk_servers(chunk)
-        self.file_map[new_file.id] = new_file
-        print(f"New file handled: {new_file.id}")
 
-    def get_least_loaded_chunk_servers(self) -> List[ChunkServer]:
-        sorted_servers = sorted(self.active_chunkservers.items(), key=lambda x: x[1])
-        return [server for _, server in sorted_servers[:3]]
-
-    def map_chunk_to_chunk_servers(self, chunk: Chunk): 
-        #should just be sending client's request to the ChunkServer. Coordinator isn't passing the data itself
+    def map_chunk_to_chunk_servers(self, chunk: Chunk):
         '''
         map each new chunk to 3 chunkservers
         '''
-        chunk_servers = self.get_least_loaded_chunk_servers()
-        self.chunk_map[chunk.id] = chunk_servers
-        for chunk_server in chunk_servers:
-            chunk_server.upload_chunk(chunk)
-            self.active_chunkservers[chunk_server] += 1
-        print(f"Chunk {chunk.id} mapped to servers: {chunk_servers}")
+        pass
 
     def remap_chunk(self, chunk: Chunk):
         '''
         remaps chunk to another ChunkServer, called when ChunkServer goes offline
         '''
-        self.map_chunk_to_chunk_servers(chunk)
 
-    def handle_delete_file(self, file_id_to_delete: File):
-        '''
-        removes relevant chunks from ChunkServers when Client deletes a file
-        '''
-        file = self.file_map[file_id_to_delete]
-        for chunk in file.chunks:
-            if chunk.id in self.chunk_map:
-                for chunk_server in self.chunk_map[chunk.id]:
-                    if self.check_active_server(chunk_server):
-                        chunk_server.delete_chunk(chunk.id)
-                        self.active_chunkservers[chunk_server] -= 1
-                del self.chunk_map[chunk.id]
-        del self.file_map[file_id_to_delete]
-        print(f"Deleted file: {file_id_to_delete}")
+    # def handle_delete_file(self, file_to_delete: File):
+    #     '''
+    #     removes relevant chunks from ChunkServers when Client deletes a file
+    #     '''

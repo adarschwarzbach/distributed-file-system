@@ -14,7 +14,7 @@ class ChunkServerConnection:
         self.max_retries = max_retries
         
 
-    def upload_chunk(self, chunk_id, chunk_object, chunk_index) -> bool:
+    def upload_chunk(self, chunk_id, chunk_object, chunk_index, file_id) -> bool:
         attempt = 0
         while attempt <= self.max_retries:
             try:
@@ -26,7 +26,8 @@ class ChunkServerConnection:
                         "chunk_id": chunk_id,
                         "chunk_index": chunk_index,
                         "chunk_size": len(chunk_object),
-                        "user_id": self.user_id
+                        "user_id": self.user_id,
+                        "file_id":file_id
                     }
                     s.sendall(json.dumps(request).encode() + b"\n\n" + chunk_object)
                     print("Chunk upload request sent to server.")
