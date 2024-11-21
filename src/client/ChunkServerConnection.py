@@ -78,39 +78,46 @@ class ChunkServerConnection:
     
     def download_chunk(self, chunk_id):
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM)  as s:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((self.chnk_srv_addr, self.chnk_srv_port))
 
+                # Prepare and send the download request
                 request = {
                     "request_type": "DOWNLOAD_CHUNK",
                     "chunk_id": chunk_id,
                 }
-                s.sendall(json.dumps(request).encode())
+                s.sendall((json.dumps(request) + "\n\n").encode())  # Add delimiter for message clarity
                 print("Chunk download request sent to server.")
 
-                data = ""
+                # Buffer to collect incoming data
+                data = b""
                 while True:
-                    part = s.recv(1024).decode()
-                    if not part:
+                    part = s.recv(4096)  # Read in 4KB chunks
+                    if not part:  # Break if the connection is closed
                         break
                     data += part
-                    if "\n\n" in data:
-                        data = data.replace("\n\n", "")
+                    if b"\n\n" in data:  # Detect the end of the response
+                        data = data.replace(b"\n\n", b"")  # Remove the delimiter
                         break
-                response = json.loads(data)  # Parse JSON response
 
-                if response.get("status") == "success":
+                # Parse the received data
+                response = json.loads(data.decode())  # Decode and parse JSON response
+
+                if response.get("status") == "SUCCESS":
+                    # Decode the base64 chunk data back to bytes
                     chunk_index = response.get("chunk_index")
-                    chunk_data = response.get("chunk_data").encode()  # Ensure the chunk data is in bytes
+                    chunk_data_base64 = response.get("chunk_data")
+                    chunk_data = base64.b64decode(chunk_data_base64)  # Decode the Base64-encoded chunk data
+
                     print(f"Chunk ID {chunk_id} (index {chunk_index}) successfully downloaded.")
-                    return chunk_index, chunk_data  # Return both chunk index and data
+                    return chunk_index, chunk_data  # Return both chunk index and binary data
                 else:
                     print(f"Error downloading chunk: {response.get('error')}")
                     return None, None
 
-                
         except Exception as e:
             print(f"Error during chunk download: {e}")
             return None, None
+
     
     
