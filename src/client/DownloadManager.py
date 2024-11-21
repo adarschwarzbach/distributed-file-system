@@ -58,7 +58,7 @@ class DownloadManager:
                     return False
 
         # Reassemble file 
-        self.assemble_file(file_id, downloaded_chunks)
+        self.assemble_file(file_id, downloaded_chunks, 'output.pdf') #replace file name
         print(f"File {file_id} downloaded and assembled successfully.")
         return True
         
@@ -75,10 +75,11 @@ class DownloadManager:
         return chunk_index, None
 
 
-    def assemble_file(self, file_id: str, downloaded_chunks: Dict[int, bytes]):
-        """Assemble chunks in order and write to the final file"""
-        output_file = self.cache_path / f"{file_id}_assembled.mov"
-        with open(output_file, 'wb') as f:
-            for chunk_index in sorted(downloaded_chunks.keys()):
-                f.write(downloaded_chunks[chunk_index])
-        print(f"File {file_id} assembled and saved to {output_file}.")
+    def assemble_file(self, file_id: str, downloaded_chunks: Dict[int, bytes], output_file_name):
+        indexes = downloaded_chunks.keys()
+        sorted_indexes = sorted(indexes)
+        with open(output_file_name, 'wb') as output_file:
+            for index in sorted_indexes:
+                binary_file = downloaded_chunks[index]
+                with open(binary_file, 'rb') as file:
+                    output_file.write(file.read())
