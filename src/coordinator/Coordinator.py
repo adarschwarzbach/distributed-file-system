@@ -43,32 +43,56 @@ class Coordinator:
 
 
     def handle_request(self, client_socket):
-        try: 
-            data = client_socket.recv(1024).decode()
-            request = json.loads(data)  # Parse JSON request
-            print(f"Received request: {request}")
+        try:
+            # Attempt to read a single message (small messages)
+            data = client_socket.recv(1024).decode().strip()
+
+            # If data is empty, handle gracefully
+            if not data:
+                print("Received empty request")
+                return
+
+            try:
+                # Try parsing the single message as JSON
+                request = json.loads(data)
+                print(f"Received request: {request}")
+            except json.JSONDecodeError:
+                # Fallback to buffered reading if JSON parsing fails
+                print("Incomplete or large message detected, switching to buffered reading")
+                while True:
+                    part = client_socket.recv(1024).decode()
+                    if not part:  # Client closed connection
+                        break
+                    data += part
+                    if "\n\n" in data:
+                        data = data.replace("\n\n", "")  # Remove delimiter
+                        break
+                request = json.loads(data)  # Parse the complete buffered message
+                print(f"Buffered request")
+
+            # Dispatch request to the appropriate handler
             if request.get("request_type") == "GET_CLIENT_ID":
                 self.handle_get_client_id(client_socket)
-            elif request.get('request_type') == 'REGISTER_NEW_FILE':
+            elif request.get("request_type") == "REGISTER_NEW_FILE":
                 self.handle_creating_new_file(request)
-            # ToDo
             elif request.get("request_type") == "REGISTER_CHUNK_SERVER":
-                # Do parsing of request for data here
-                self.handle_new_chunk_server(request) # determine what data is passed here
-            elif request.get('request_type') == 'GET_CHUNK_SERVERS':
+                self.handle_new_chunk_server(request)
+            elif request.get("request_type") == "GET_CHUNK_SERVERS":
                 self.handle_getting_chunk_servers(client_socket)
- 
+            else:
+                print(f"Unknown request type: {request.get('request_type')}")
 
-
-            # Handle other request types below
         except json.JSONDecodeError:
             print("Invalid JSON received")
 
         except Exception as e:
             print(f"Error handling request: {e}")
-        
+
         finally:
-            client_socket.close() # use this to close connction once finished 
+            client_socket.close()  # Ensure the connection is closed
+
+
+
 
     def handle_getting_chunk_servers(self, client_socket):
         chunk_servers = []

@@ -102,12 +102,16 @@ class CoordinatorConnection:
             'chunk_metadata': chunk_metadata
         }
         try:
+            serialized_req = json.dumps(req)  # Serialize request to check for issues
+            print(f"Serialized Request: {serialized_req}")  # Debug log
+            
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((self.coord_addr, self.coord_port))
-                s.sendall(json.dumps(req).encode())
+                s.sendall(serialized_req.encode())  # Send JSON to the server
 
         except Exception as e:
             print(f'Error registering new file: {e}')
+
 
     # def register_new_file(self, file_info):
     #     request = {

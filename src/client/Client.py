@@ -6,6 +6,7 @@ import json
 from src.client.CoordinatorConnection import CoordinatorConnection
 from src.client.UploadManager import UploadManager
 from src.client.DownloadManager import DownloadManager
+import uuid
 
 class Client:
     def __init__(self, coordinator_host, coordinator_port):
@@ -31,8 +32,9 @@ class Client:
             if not Path(file_location).is_file():
                 print("The specified file does not exist. Please check the path and try again.")
                 return
+            file_name = input("Please enter a name for this file: ")
             
-            self.upload_manager.upload_file(file_location, 1, f"{file_location}_{time.time()}") # 10 mg chunks
+            self.upload_manager.upload_file(file_location, 1, f"{file_name}_{str(uuid.uuid4())}") # 10 mg chunks
 
         elif choice == '2':
             # Prompt for file ID to download
