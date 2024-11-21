@@ -5,7 +5,7 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 import uuid 
 import json
-
+import collections
 
 class Coordinator:
     def __init__(self, host='localhost', port=6000, max_workers=10):
@@ -28,7 +28,7 @@ class Coordinator:
 
         #ben's code
         self.chunk_server_map: Dict[int, ChunkServerAbstraction] = {} #map chunkserver id's to the address and port of the chunkserver
-        self.chunk_map: Dict[int, int] = {} #map chunk ids to chunkserver id that hosts it --> WILL NEED TO CHANGE WHEN WE ADD REPLICATION BUT GOOD STARTING POINT
+        self.chunk_map: Dict[int, List[int]] = collections.defaultdict(list) #map chunk ids to chunkserver id that hosts it --> WILL NEED TO CHANGE WHEN WE ADD REPLICATION BUT GOOD STARTING POINT
         self.file_map: Dict[int, File] = {}
 
     def start(self):
@@ -108,18 +108,32 @@ class Coordinator:
         pass
 
     def handle_creating_new_file(self, request):
-        file_id = request.get('file_id')
-        chunk_metadata = request.get('chunk_metadata')
-        chunk_ids = [chunk["chunk_id"] for chunk in chunk_metadata]
+        metadata = request.get('chunk_metadata')
+        file_name = request.get('file_id')
+        # print('ran handle_creating_new_file')
+        new_file = File(file_name)
+        chunk_indexes_to_ids = {}
+        for obj in metadata:
+            chunk_id, chunk_index, chunk_server_id = obj['chunk_id'], obj['chunk_index'], obj['chunk_server_id']
+            self.chunk_map[chunk_id].append(chunk_server_id)
+            chunk_indexes_to_ids[chunk_index] = chunk_id
+        new_file.chunks = chunk_indexes_to_ids
+        self.file_map[file_name] = new_file
+        # print(self.file_map)
+        # print(self.chunk_map)
 
-        #store file
-        file = File(file_id, chunk_ids)
-        self.file_map[file_id] = file
+        # file_id = request.get('file_id')
+        # chunk_metadata = request.get('chunk_metadata')
+        # chunk_ids = [chunk["chunk_id"] for chunk in chunk_metadata]
 
-        #store where each chunk can be found
-        for chunk in chunk_metadata:
-            chunk_id, chunk_server_id = chunk['chunk_id'], chunk['chunk_server_id']
-            self.chunk_map[chunk_id] = chunk_server_id
+        # #store file
+        # file = File(file_id, chunk_ids)
+        # self.file_map[file_id] = file
+
+        # #store where each chunk can be found
+        # for chunk in chunk_metadata:
+        #     chunk_id, chunk_server_id = chunk['chunk_id'], chunk['chunk_server_id']
+        #     self.chunk_map[chunk_id] = chunk_server_id
 
 
 
