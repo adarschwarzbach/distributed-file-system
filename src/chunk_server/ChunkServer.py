@@ -2,13 +2,13 @@ from concurrent.futures import ThreadPoolExecutor
 import socket
 import json
 import os
-
+import uuid
 
 class ChunkServer:
-    def __init__(self, id, host='localhost', port=6000, max_workers=10):
+    def __init__(self, host='localhost', port=5000, max_workers=10):
         
         self.chunk_map = {} #map chunk_ids to file paths
-        self.id = id
+        self.id = uuid.uuid4()
         # Networking & threading
         self.host = host
         self.port = port
@@ -17,10 +17,30 @@ class ChunkServer:
         self.server_socket.listen(5) # Up to 5 concurrent connections, after 5, requests are queued
         self.executor = ThreadPoolExecutor(max_workers=max_workers) # create a managed thread pool
 
+        self.coord_host = 'localhost'
+        self.coord_port = 6000
+        self.coord_socket = None 
+
+    def connect_to_coordinator(self):
+        try:
+            self.coord_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.coord_socket.connect((self.coord_host, self.coord_port))
+            print(f"Connected to coordinator at {self.coord_host}:{self.coord_port}")
+
+            registration_data = {
+                "request_type": "REGISTER_CHUNK_SERVER",
+                "chunk_server_id": self.id,
+                "host": self.host,
+                "port": self.port
+            }
+            self.coord_socket.sendall(json.dumps(registration_data).encode())
+            response = self.coord_socket.recv(1024).decode()
+            print(f"Coordinator response: {response}")
+        except Exception as e:
+            print(f"Failed to connect to coordinator: {e}")
+
     def start(self):
-        '''
-        Start the ChunkServer
-        '''
+        self.connect_to_coordinator
         while True:
             client_socket, addr = self.server_socket.accept()
             print(f"connected to {addr}")
