@@ -32,7 +32,7 @@ class Client:
                 print("The specified file does not exist. Please check the path and try again.")
                 return
             
-            self.upload_manager.upload_file(file_location, 1, f"{file_location}_{time.time()}")
+            self.upload_manager.upload_file(file_location, 1, f"{file_location}_{time.time()}") # 10 mg chunks
 
         elif choice == '2':
             # Prompt for file ID to download

@@ -21,6 +21,7 @@ class UploadManager:
 
     def upload_file(self, file_location, chunk_size_mb, file_id):
         chunk_server_info = self.coordinator_connection.get_chunk_servers() # form [{chnk_srv_addr, chnk_srv_port, chnk_srv_id}, ...]
+        print(chunk_server_info)
         self.chunk_servers = [
             ChunkServerConnection(self.user_id, server['chnk_srv_addr'], server['chnk_srv_port'], server['chnk_srv_id'])
             for server in chunk_server_info

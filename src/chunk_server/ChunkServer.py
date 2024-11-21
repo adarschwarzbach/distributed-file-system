@@ -3,6 +3,9 @@ import socket
 import json
 import os
 import uuid
+import base64
+from pathlib import Path
+
 
 class ChunkServer:
     def __init__(self, host='localhost', port=5000, max_workers=10):
@@ -49,67 +52,75 @@ class ChunkServer:
 
 
     def handle_request(self, client_socket):
-        try: 
-            data = client_socket.recv(1024).decode()
-            request = json.loads(data)  # Parse JSON request
-            print(f"Received request: {request}")
+        try:
+            # Buffer data until delimiter is detected
+            data = ""
+            while True:
+                part = client_socket.recv(1024).decode()
+                if not part:
+                    break
+                data += part
+                if "\n\n" in data:
+                    data = data.replace("\n\n", "")
+                    break
+
+            # Parse JSON request
+            request = json.loads(data)
 
             if request.get("request_type") == "UPLOAD_CHUNK":
-                self.upload_chunk(client_socket)
+                self.upload_chunk(request, client_socket)
 
             elif request.get("request_type") == "DOWNLOAD_CHUNK":
-                self.download_chunk(client_socket)
+                self.download_chunk(request, client_socket)
 
-            elif request.get('request_type') == 'HEALTH_CHECK':
+            elif request.get("request_type") == "HEALTH_CHECK":
                 self.respond_health_check(client_socket)
-            # Handle other request types below
 
         except json.JSONDecodeError:
             print("Invalid JSON received")
 
-
         except Exception as e:
             print(f"Error handling request: {e}")
-        
-        finally:
-            client_socket.close() # use this to close connction once finished 
-    
-    def upload_chunk(self, client_socket):
-        try:
-            metadata = client_socket.recv(1024).decode()
-            metadata = json.loads(metadata)
 
-            chunk_id = metadata.get("chunk_id")  
-            chunk_size = metadata.get("chunk_size") 
-            file_id = metadata.get('file_id')
-            if not chunk_id or not chunk_size:
-                raise ValueError("Invalid metadata received.")
+        finally:
+            client_socket.close()
+
+    
+    def upload_chunk(self, request, client_socket):
+        try:
+            # Extract metadata and chunk data from request
+            chunk_id =  os.path.basename(request.get("chunk_id"))  # Ensure chunk_id is a simple identifier
+            chunk_size = request.get("chunk_size")
+            chunk_data_base64 = request.get("chunk_data")
+            file_id = request.get("file_id")
+
+            if not chunk_id or not chunk_size or not chunk_data_base64:
+                raise ValueError("Invalid request received.")
+
+            # Decode Base64-encoded chunk data to binary
+            chunk_data = base64.b64decode(chunk_data_base64)
 
             print(f"Receiving chunk of chunk_id: {chunk_id} (Size: {chunk_size} bytes)")
 
-            file_path = f"./chunks/{chunk_id}"
+            self.chunk_path = Path.home() / '512_chunk_path'
+            self.chunk_path.mkdir(parents=True, exist_ok=True)
+            chunk_file_path = self.chunk_path / f"{chunk_id}.bin"  # Use .bin for a viewable binary file
 
-            # Ensure the chunks directory exists
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            # Write the binary chunk data to the file
+            with open(chunk_file_path, "wb") as chunk_file:
+                chunk_file.write(chunk_data)
 
-            # Open a file to write the incoming data
-            with open(file_path, "wb") as chunk_file:
-                received_data = 0
-                while received_data < chunk_size:
-                    buffer = client_socket.recv(1024)  # Receive in 1024-byte chunks
-                    if not buffer:
-                        break
-                    chunk_file.write(buffer)
-                    received_data += len(buffer)
+            # Update the chunk map with the new chunk
+            self.chunk_map[chunk_id] = str(chunk_file_path)
 
-            if received_data != chunk_size:
-                raise ValueError("Incomplete data received.")
-
-            # Update the chunk map
-            self.chunk_map[chunk_id] = file_path
-
-            print(f"Chunk for chunk_id {chunk_id} saved successfully at {file_path}.")
+            print(f"Chunk for chunk_id {chunk_id} saved successfully at {chunk_file_path}.")
             client_socket.send(json.dumps({"status": "SUCCESS"}).encode())
+
+
+        except Exception as e:
+            print(f"Error uploading chunk: {e}")
+            client_socket.send(json.dumps({"status": "FAILURE", "error": str(e)}).encode())
+
 
             #HAD THIS BEFORE I REALIZED I COULD UPDATE COORDINATE VIA CLIENT AFTER EVERYTHING
             #notify coordinator that this specific chunk server stored a specific chunk for a specific file

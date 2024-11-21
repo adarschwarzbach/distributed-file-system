@@ -12,7 +12,7 @@ def start_service():
     # Optional arguments for the client
     parser.add_argument("--coordinator_host", default="localhost",
                         help="Specify the coordinator's host address (only for client).")
-    parser.add_argument("--coordinator_port", type=int, default=5000,
+    parser.add_argument("--coordinator_port", type=int, default=6000,
                         help="Specify the coordinator's port number (only for client).")
     
     # Host and port for the coordinator and chunk server

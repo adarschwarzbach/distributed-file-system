@@ -51,6 +51,7 @@ class CoordinatorConnection:
 
                 response = json.loads(data)
                 chunk_servers = response.get("chunk_servers", [])  # form [{chnk_srv_addr, chnk_srv_port, chnk_srv_id}, ...]
+                chunk_servers = [json.loads(server) for server in chunk_servers]
                 
                 if not chunk_servers:
                     print("No Chunk Servers available from Coordinator.")

@@ -57,7 +57,6 @@ class Coordinator:
                 self.handle_new_chunk_server(request) # determine what data is passed here
             elif request.get('request_type') == 'GET_CHUNK_SERVERS':
                 self.handle_getting_chunk_servers(client_socket)
-
  
 
 
@@ -73,8 +72,8 @@ class Coordinator:
 
     def handle_getting_chunk_servers(self, client_socket):
         chunk_servers = []
-        for _, chunk_server_abstraction in self.chunk_server_map:
-            chunk_servers.append(chunk_server_abstraction)
+        for _, chunk_server_abstraction in self.chunk_server_map.items():
+            chunk_servers.append(chunk_server_abstraction.to_json())
         response = {
             'chunk_servers': chunk_servers
         }
