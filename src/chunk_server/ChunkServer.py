@@ -29,7 +29,7 @@ class ChunkServer:
 
             registration_data = {
                 "request_type": "REGISTER_CHUNK_SERVER",
-                "chunk_server_id": self.id,
+                "chunk_server_id": str(self.id),
                 "host": self.host,
                 "port": self.port
             }
@@ -40,7 +40,8 @@ class ChunkServer:
             print(f"Failed to connect to coordinator: {e}")
 
     def start(self):
-        self.connect_to_coordinator
+        print('started chunk server')
+        self.connect_to_coordinator()
         while True:
             client_socket, addr = self.server_socket.accept()
             print(f"connected to {addr}")
