@@ -176,3 +176,13 @@ class ChunkServer:
     def replicate_chunks(self, chunk_id, chunk_socket):
         #replicate chunk to other ChunkServers
         pass
+
+
+
+
+
+
+
+
+
+    # /Users/adarschwarzbach/Downloads/Bytebytego_Big_Archive_System_Design_2023.pdf

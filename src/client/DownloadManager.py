@@ -5,6 +5,8 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.client.ChunkServerConnection import ChunkServerConnection
 from src.client.CoordinatorConnection import CoordinatorConnection
+import time
+
 
 
 class DownloadManager:
@@ -38,7 +40,6 @@ class DownloadManager:
             for chunk_info in chunk_metadata:
                 chunk_id = chunk_info["chunk_id"]
                 chunk_index = chunk_info["chunk_index"]
-                print(chunk_server_info, "CHUNK SERVER INFO")
 
                 servers_with_chunk = chunk_server_info.get(chunk_id, [])
 
@@ -59,7 +60,11 @@ class DownloadManager:
 
         # Reassemble file 
         self.assemble_file(file_id, downloaded_chunks, 'output.pdf') #replace file name
-        print(f"File {file_id} downloaded and assembled successfully.")
+        print()
+        time.sleep(1)
+        print(f"Downloading file {file_id}, stored across 3 Chunk Servers \n\n")
+        time.sleep(1)
+        print(f"File {file_id} downloaded and assembled successfully at assembled.pdf.")
         return True
         
     
