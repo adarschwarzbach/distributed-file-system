@@ -21,7 +21,7 @@ class DownloadManager:
     
     def download_file(self, file_id):
         chunk_server_info = self.coordinator_connection.get_chunk_locations(file_id) # form [ {chunk_id:[{chnk_srv_addr, chnk_srv_port, chnk_srv_id,}, {replica_2}, {replica_3}], ...]
-        print(chunk_server_info)
+        print('CHUNK SERVER INFO', chunk_server_info)
         metadata_file = self.cache_path / f"{file_id}_metadata.json"
         if not metadata_file.is_file():
             print(f"Metadata file {metadata_file} does not exist.")
@@ -38,14 +38,16 @@ class DownloadManager:
             for chunk_info in chunk_metadata:
                 chunk_id = chunk_info["chunk_id"]
                 chunk_index = chunk_info["chunk_index"]
-                print(chunk_server_info, "CHUNK SERVER INFO")
-
-                servers_with_chunk = chunk_server_info.get(chunk_id, [])
-
+                chunk_server_id, chunk_server_addr, chunk_server_port = chunk_info['chunk_server_id'], chunk_info['chunk_server_addr'], chunk_info['chunk_server_port'] #just one server rn...will have to make it a list of servers in the future
+                server = {
+                    "chnk_srv_addr": chunk_server_addr,
+                    "chnk_srv_port": chunk_server_port,
+                    "chnk_srv_id": chunk_server_id
+                }
                 # Only schedule a download if there are servers for the chunk
-                if servers_with_chunk:
+                if server:
                     # Attempt download from each server replica in order
-                    future = executor.submit(self.download_chunk_from_servers, chunk_id, chunk_index, servers_with_chunk)
+                    future = executor.submit(self.download_chunk_from_servers, chunk_id, chunk_index, [server])
                     futures.append(future)
 
             # Process download results
@@ -67,7 +69,7 @@ class DownloadManager:
         """Attempt to download a chunk from the list of servers in order"""
         for server_info in servers:
             server = ChunkServerConnection(self.user_id, server_info["chnk_srv_addr"], server_info["chnk_srv_port"], server_info["chnk_srv_id"])
-            chunk_index, chunk_data = server.download_chunk(chunk_id)
+            chunk_data = server.download_chunk(chunk_id)
             if chunk_data is not None:
                 print(f"Downloaded chunk {chunk_id} from server {server.chunk_server_id}")
                 return chunk_index, chunk_data
@@ -76,10 +78,10 @@ class DownloadManager:
 
 
     def assemble_file(self, file_id: str, downloaded_chunks: Dict[int, bytes], output_file_name):
+        print('\ndownloaded chunks', downloaded_chunks)
         indexes = downloaded_chunks.keys()
         sorted_indexes = sorted(indexes)
         with open(output_file_name, 'wb') as output_file:
             for index in sorted_indexes:
-                binary_file = downloaded_chunks[index]
-                with open(binary_file, 'rb') as file:
-                    output_file.write(file.read())
+                binary_data = downloaded_chunks[index]
+                output_file.write(binary_data)

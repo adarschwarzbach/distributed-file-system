@@ -66,6 +66,7 @@ class ChunkServer:
 
             # Parse JSON request
             request = json.loads(data)
+            print('request', request)
 
             if request.get("request_type") == "UPLOAD_CHUNK":
                 self.upload_chunk(request, client_socket)
@@ -137,28 +138,24 @@ class ChunkServer:
             client_socket.send(json.dumps({"status": "FAILURE", "error": str(e)}).encode())
             
 
-    def download_chunk(self, client_socket):
+    def download_chunk(self, request, client_socket):
         try:
-            metadata = client_socket.recv(1024).decode()
-            metadata = json.loads(metadata)
-
-            chunk_id = metadata.get("chunk_id")  
+            chunk_id = request.get("chunk_id")  
             file_path = self.chunk_map[chunk_id]
-
             if not file_path or not os.path.exists(file_path):
                 raise ValueError(f"Chunk with ID {chunk_id} not found.")
 
             print(f"Sending chunk with ID {chunk_id} from {file_path}")
 
             with open(file_path, "rb") as chunk_file:
-                while True:
-                    buffer = chunk_file.read(1024)  # Read in 1024-byte chunks
-                    if not buffer:
-                        break
-                    client_socket.send(buffer)
+                binary_data = chunk_file.read()
+
+            base64_data = base64.b64encode(binary_data)
+            base64_data += b"\n\n"
+            client_socket.sendall(base64_data)
 
             print(f"Chunk with ID {chunk_id} sent successfully.")
-            client_socket.send(json.dumps({"status": "SUCCESS", "chunk_id": chunk_id}).encode())
+            #client_socket.send(json.dumps({"status": "SUCCESS", "chunk_id": chunk_id}).encode())
 
 
         except Exception as e:

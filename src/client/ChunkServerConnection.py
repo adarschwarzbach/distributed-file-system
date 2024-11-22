@@ -61,7 +61,7 @@ class ChunkServerConnection:
                         return True
                     elif response.get("status") == "FAILURE":
                         attempt += 1
-                        print(f"Server error during chunk upload for {chunk_id}. Retry attempt {attempt}/{self.max_retries}. Error: {response.get("error")}")
+                        print(f"Server error during chunk upload for {chunk_id}. Retry attempt {attempt}/{self.max_retries}. Error: {response.get('error')}")
                         time.sleep(1.2 ** attempt)
                     else:
                         print("Error parsing status")
@@ -101,19 +101,19 @@ class ChunkServerConnection:
                         break
 
                 # Parse the received data
-                response = json.loads(data.decode())  # Decode and parse JSON response
+                #response = json.loads(data.decode())  # Decode and parse JSON response
 
-                if response.get("status") == "SUCCESS":
+                #if response.get("status") == "SUCCESS":
                     # Decode the base64 chunk data back to bytes
-                    chunk_index = response.get("chunk_index")
-                    chunk_data_base64 = response.get("chunk_data")
-                    chunk_data = base64.b64decode(chunk_data_base64)  # Decode the Base64-encoded chunk data
+                    #chunk_index = response.get("chunk_index")
+                    #chunk_data_base64 = response.get("chunk_data")
+                chunk_data = base64.b64decode(data)
 
-                    print(f"Chunk ID {chunk_id} (index {chunk_index}) successfully downloaded.")
-                    return chunk_index, chunk_data  # Return both chunk index and binary data
-                else:
-                    print(f"Error downloading chunk: {response.get('error')}")
-                    return None, None
+                print(f"Chunk ID {chunk_id} successfully downloaded.")
+                return chunk_data  
+                #else:
+                    #print(f"Error downloading chunk: {response.get('error')}")
+                    #return None, None
 
         except Exception as e:
             print(f"Error during chunk download: {e}")
