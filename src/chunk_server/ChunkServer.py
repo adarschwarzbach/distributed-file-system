@@ -24,6 +24,8 @@ class ChunkServer:
         self.coord_host = 'localhost'
         self.coord_port = 6000
 
+        self.known_chunk_servers = set()
+
     def connect_to_coordinator(self):
         try:
             coord_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -90,6 +92,7 @@ class ChunkServer:
     
     def upload_chunk(self, request, client_socket):
         try:
+            #Upload chunk to memory
             chunk_id =  os.path.basename(request.get("chunk_id"))  # Ensure chunk_id is a simple identifier
             chunk_size = request.get("chunk_size")
             chunk_data_base64 = request.get("chunk_data")
@@ -113,6 +116,7 @@ class ChunkServer:
             print(f"Chunk for chunk_id {chunk_id} saved successfully at {chunk_file_path}.")
             client_socket.send(json.dumps({"status": "SUCCESS"}).encode())
 
+            #Notify Coordinator that we successfully uploaded a chunk
             coord_req = {
                 'request_type': 'CHUNK_UPLOAD_SUCCESS',
                 'chunk_id': chunk_id,
@@ -121,6 +125,19 @@ class ChunkServer:
             coord_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             coord_socket.connect((self.coord_host, self.coord_port))
             coord_socket.send(json.dumps(coord_req).encode())
+
+            #OPTIONAL: Replicate Chunk to other ChunkServers
+            replicate = request.get('replicate')
+            if not replicate or replicate is None:
+                return
+            chunk_server_request = {
+                'request_type': 'UPLOAD_CHUNK',
+                'chunk_id': chunk_id,
+                'chunk_size': chunk_size,
+                'chunk_data': chunk_data_base64,
+                'replicate': False
+            }
+            self.replicate_chunk_on_upload(chunk_server_request)
 
         except Exception as e:
             print(f"Error uploading chunk: {e}")
@@ -168,9 +185,26 @@ class ChunkServer:
         except Exception as e:
             print(f"Error sending health check response: {e}")
     
-    def replicate_chunks(self, chunk_id, chnk_srv_addr, chnk_srv_port):
+
+    #Replicate chunk on upload to 2 other ChunkServers
+    def replicate_chunk_on_upload(self, chunk_server_req):
+        num_replications = 0
+        for other_chunk_server_addr, other_chunk_server_port in self.known_chunk_servers:
+            if num_replications >=2:
+                return
+            num_replications += 1
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((other_chunk_server_addr, other_chunk_server_port))
+                    s.sendall((json.dumps(chunk_server_req) + "\n\n").encode())
+            except Exception as e:
+                print(f'Error replicate chunk: {e}')
+
+    #Replicate a chunk by request of Coordinator
+    def replicate_chunk_from_download(self, chunk_id, chnk_srv_addr, chnk_srv_port):
         #replicate chunk to other ChunkServers
         try:
+            #Download data to replicate
             file_path = self.chunk_map[chunk_id]
             if not file_path or not os.path.exists(file_path):
                 raise ValueError(f"Chunk with ID {chunk_id} not found.")
@@ -180,6 +214,7 @@ class ChunkServer:
             with open(file_path, "rb") as chunk_file:
                 binary_data = chunk_file.read()
 
+            #Send downloaded data to ChunkServer
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.connect((chnk_srv_addr, chnk_srv_port))
                     chunk_data_base64 = base64.b64encode(binary_data).decode('utf-8')
@@ -188,7 +223,8 @@ class ChunkServer:
                         "request_type": "UPLOAD_CHUNK",
                         "chunk_id": chunk_id,
                         "chunk_size": len(binary_data),
-                        "chunk_data": chunk_data_base64
+                        "chunk_data": chunk_data_base64,
+                        'replicate': False
                     }
                     s.sendall((json.dumps(request) + "\n\n").encode())
 

@@ -36,7 +36,8 @@ class ChunkServerConnection:
                         "chunk_size": len(chunk_object),
                         "user_id": self.user_id,
                         "file_id": file_id,
-                        "chunk_data": chunk_data_base64
+                        "chunk_data": chunk_data_base64,
+                        'replicate': True
                     }
 
                     # Append delimiter and send
