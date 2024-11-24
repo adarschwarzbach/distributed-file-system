@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 import socket
 import json
 import os
+import time
 import uuid
 import base64
 from pathlib import Path
@@ -72,7 +73,8 @@ class ChunkServer:
                 self.upload_chunk(request, client_socket)
 
             elif request.get("request_type") == "DOWNLOAD_CHUNK":
-                self.download_chunk(request, client_socket)
+                chunk_id = request.get('chunk_id')
+                self.download_chunk(chunk_id, client_socket)
 
             elif request.get("request_type") == "HEALTH_CHECK":
                 self.respond_health_check(client_socket)
@@ -104,7 +106,7 @@ class ChunkServer:
 
             self.chunk_path = Path.home() / '512_chunk_path'
             self.chunk_path.mkdir(parents=True, exist_ok=True)
-            chunk_file_path = self.chunk_path / f"{chunk_id}.bin"  # Use .bin for a viewable binary file
+            chunk_file_path = self.chunk_path / f"{self.id[:6]}_{chunk_id}.bin"  # Use .bin for a viewable binary file
 
             # Write the binary chunk data to the file
             with open(chunk_file_path, "wb") as chunk_file:
@@ -132,14 +134,10 @@ class ChunkServer:
             #    }
            # self.coord_socket.sendall(json.dumps(coordinator_notification).encode())
 
-        except Exception as e:
-            print(f"Error uploading chunk: {e}")
-            client_socket.send(json.dumps({"status": "FAILURE", "error": str(e)}).encode())
             
 
-    def download_chunk(self, request, client_socket):
+    def download_chunk(self, chunk_id, client_socket):
         try:
-            chunk_id = request.get("chunk_id")  
             file_path = self.chunk_map[chunk_id]
             if not file_path or not os.path.exists(file_path):
                 raise ValueError(f"Chunk with ID {chunk_id} not found.")
@@ -149,8 +147,6 @@ class ChunkServer:
             with open(file_path, "rb") as chunk_file:
                 binary_data = chunk_file.read()
 
-            #base64_data = base64.b64encode(binary_data)
-            #base64_data += b"\n\n"
             client_socket.sendall(binary_data)
 
             print(f"Chunk with ID {chunk_id} sent successfully.")
@@ -169,19 +165,51 @@ class ChunkServer:
         except Exception as e:
             print(f"Error sending health check response: {e}")
     
-    def replicate_chunks(self, chunk_id, chunk_socket):
+    def replicate_chunks(self, chunk_id, chnk_srv_addr, chnk_srv_port):
         #replicate chunk to other ChunkServers
         try:
             file_path = self.chunk_map[chunk_id]
             if not file_path or not os.path.exists(file_path):
                 raise ValueError(f"Chunk with ID {chunk_id} not found.")
 
+            print(f"Sending chunk with ID {chunk_id} from {file_path}")
+
             with open(file_path, "rb") as chunk_file:
                 binary_data = chunk_file.read()
 
-            chunk_socket.sendall(binary_data)
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((chnk_srv_addr, chnk_srv_port))
+                    chunk_data_base64 = base64.b64encode(binary_data).decode('utf-8')
+
+                    request = {
+                        "request_type": "UPLOAD_CHUNK",
+                        "chunk_id": chunk_id,
+                        "chunk_size": len(binary_data),
+                        "chunk_data": chunk_data_base64
+                    }
+                    s.sendall((json.dumps(request) + "\n\n").encode())
+
+                    data = ""
+                    while True:
+                        part = s.recv(1024).decode()
+                        if not part:
+                            break
+                        data += part
+                        if "\n\n" in data:
+                            data = data.replace("\n\n", "")
+                            break
+
+                    response = json.loads(data)  # Parse JSON response
+
+                    if response.get("status") == "SUCCESS":
+                        print(f"Chunk ID {chunk_id} successfully uploaded to ChunkServer at {self.chnk_srv_port}:{self.chnk_srv_addr}")
+                        return True
+                    elif response.get("status") == "FAILURE":
+                        print(f"Server error during chunk upload for {chunk_id}. Retry attempt: Error: {response.get('error')}")
+                        time.sleep(1.2)
 
         except Exception as e:
             print(f"Error downloading chunk: {e}")
-        pass
         
+        
+
