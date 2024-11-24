@@ -19,8 +19,8 @@ class Coordinator:
         self.executor = ThreadPoolExecutor(max_workers=max_workers) # create a managed thread pool
 
         #ben's code
-        self.chunk_server_map: Dict[int, ChunkServerAbstraction] = {} #map chunkserver id's to the address and port of the chunkserver
-        self.chunk_map: Dict[int, List[int]] = collections.defaultdict(list) #map chunk ids to chunkserver id that hosts it --> WILL NEED TO CHANGE WHEN WE ADD REPLICATION BUT GOOD STARTING POINT
+        self.chunk_server_map: Dict[str, ChunkServerAbstraction] = {} #map chunkserver id's to the address and port of the chunkserver
+        self.chunk_map: Dict[int, List[str]] = collections.defaultdict(list) #map chunk ids to chunkserver id that hosts it --> WILL NEED TO CHANGE WHEN WE ADD REPLICATION BUT GOOD STARTING POINT
         self.file_map: Dict[str, File] = {}
 
         self.file_to_chunk_to_server = {} # {file_id: [{chunk_id, chunk_index, [chunk_server(s)]}]}
@@ -75,6 +75,8 @@ class Coordinator:
                 self.handle_getting_chunk_servers(request, client_socket)
             elif request.get("request_type") == "GET_FILE_DATA":
                 self.handle_get_file(request, client_socket)
+            elif request.get('request_type') == "CHUNK_UPLOAD_SUCCESS":
+                self.handle_chunk_upload_success(request)
             else:
                 print(f"Unknown request type: {request.get('request_type')}")
 
@@ -137,12 +139,14 @@ class Coordinator:
         self.file_map[file_name] = new_file
         for obj in metadata:
             chunk_id, chunk_index, chunk_server_id = obj['chunk_id'], obj['chunk_index'], obj['chunk_server_id']
-            self.chunk_map[chunk_id].append(chunk_server_id)
+            #self.chunk_map[chunk_id].append(chunk_server_id)
             new_file.update_indexes(chunk_id, chunk_index) 
 
            
-
-        print('\n\n\n')
+    def handle_chunk_upload_success(self, request):
+        chunk_id = request.get('chunk_id')
+        chunk_server_id = request.get('chunk_server_id')
+        self.chunk_map[chunk_id].append(chunk_server_id)
        
 
 

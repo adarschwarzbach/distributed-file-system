@@ -23,12 +23,11 @@ class ChunkServer:
 
         self.coord_host = 'localhost'
         self.coord_port = 6000
-        self.coord_socket = None 
 
     def connect_to_coordinator(self):
         try:
-            self.coord_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.coord_socket.connect((self.coord_host, self.coord_port))
+            coord_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            coord_socket.connect((self.coord_host, self.coord_port))
             print(f"Connected to coordinator at {self.coord_host}:{self.coord_port}")
 
             registration_data = {
@@ -37,8 +36,8 @@ class ChunkServer:
                 "host": self.host,
                 "port": self.port
             }
-            self.coord_socket.sendall(json.dumps(registration_data).encode())
-            response = self.coord_socket.recv(1024).decode()
+            coord_socket.sendall(json.dumps(registration_data).encode())
+            response = coord_socket.recv(1024).decode()
             print(f"Coordinator response: {response}")
         except Exception as e:
             print(f"Failed to connect to coordinator: {e}")
@@ -91,7 +90,6 @@ class ChunkServer:
     
     def upload_chunk(self, request, client_socket):
         try:
-            # Extract metadata and chunk data from request
             chunk_id =  os.path.basename(request.get("chunk_id"))  # Ensure chunk_id is a simple identifier
             chunk_size = request.get("chunk_size")
             chunk_data_base64 = request.get("chunk_data")
@@ -99,7 +97,6 @@ class ChunkServer:
             if not chunk_id or not chunk_size or not chunk_data_base64:
                 raise ValueError("Invalid request received.")
 
-            # Decode Base64-encoded chunk data to binary
             chunk_data = base64.b64decode(chunk_data_base64)
 
             print(f"Receiving chunk of chunk_id: {chunk_id} (Size: {chunk_size} bytes)")
@@ -108,16 +105,22 @@ class ChunkServer:
             self.chunk_path.mkdir(parents=True, exist_ok=True)
             chunk_file_path = self.chunk_path / f"{str(self.id)[:6]}_{chunk_id}.bin"  # Use .bin for a viewable binary file
 
-            # Write the binary chunk data to the file
             with open(chunk_file_path, "wb") as chunk_file:
                 chunk_file.write(chunk_data)
 
-            # Update the chunk map with the new chunk
             self.chunk_map[chunk_id] = str(chunk_file_path)
 
             print(f"Chunk for chunk_id {chunk_id} saved successfully at {chunk_file_path}.")
             client_socket.send(json.dumps({"status": "SUCCESS"}).encode())
 
+            coord_req = {
+                'request_type': 'CHUNK_UPLOAD_SUCCESS',
+                'chunk_id': chunk_id,
+                'chunk_server_id': str(self.id)
+            }
+            coord_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            coord_socket.connect((self.coord_host, self.coord_port))
+            coord_socket.send(json.dumps(coord_req).encode())
 
         except Exception as e:
             print(f"Error uploading chunk: {e}")
