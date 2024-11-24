@@ -89,28 +89,17 @@ class ChunkServerConnection:
                 s.sendall((json.dumps(request) + "\n\n").encode())  # Add delimiter for message clarity
                 print("Chunk download request sent to server.")
 
-                # Buffer to collect incoming data
+                # Buffer to collect incoming  binary data
                 data = b""
                 while True:
                     part = s.recv(4096)  # Read in 4KB chunks
                     if not part:  # Break if the connection is closed
                         break
                     data += part
-                    if b"\n\n" in data:  # Detect the end of the response
-                        data = data.replace(b"\n\n", b"")  # Remove the delimiter
-                        break
-
-                # Parse the received data
-                #response = json.loads(data.decode())  # Decode and parse JSON response
-
-                #if response.get("status") == "SUCCESS":
-                    # Decode the base64 chunk data back to bytes
-                    #chunk_index = response.get("chunk_index")
-                    #chunk_data_base64 = response.get("chunk_data")
-                chunk_data = base64.b64decode(data)
+                  
 
                 print(f"Chunk ID {chunk_id} successfully downloaded.")
-                return chunk_data  
+                return data  
                 #else:
                     #print(f"Error downloading chunk: {response.get('error')}")
                     #return None, None

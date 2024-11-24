@@ -93,7 +93,6 @@ class ChunkServer:
             chunk_id =  os.path.basename(request.get("chunk_id"))  # Ensure chunk_id is a simple identifier
             chunk_size = request.get("chunk_size")
             chunk_data_base64 = request.get("chunk_data")
-            file_id = request.get("file_id")
 
             if not chunk_id or not chunk_size or not chunk_data_base64:
                 raise ValueError("Invalid request received.")
@@ -150,9 +149,9 @@ class ChunkServer:
             with open(file_path, "rb") as chunk_file:
                 binary_data = chunk_file.read()
 
-            base64_data = base64.b64encode(binary_data)
-            base64_data += b"\n\n"
-            client_socket.sendall(base64_data)
+            #base64_data = base64.b64encode(binary_data)
+            #base64_data += b"\n\n"
+            client_socket.sendall(binary_data)
 
             print(f"Chunk with ID {chunk_id} sent successfully.")
             #client_socket.send(json.dumps({"status": "SUCCESS", "chunk_id": chunk_id}).encode())
@@ -172,4 +171,17 @@ class ChunkServer:
     
     def replicate_chunks(self, chunk_id, chunk_socket):
         #replicate chunk to other ChunkServers
+        try:
+            file_path = self.chunk_map[chunk_id]
+            if not file_path or not os.path.exists(file_path):
+                raise ValueError(f"Chunk with ID {chunk_id} not found.")
+
+            with open(file_path, "rb") as chunk_file:
+                binary_data = chunk_file.read()
+
+            chunk_socket.sendall(binary_data)
+
+        except Exception as e:
+            print(f"Error downloading chunk: {e}")
         pass
+        
