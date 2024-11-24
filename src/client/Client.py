@@ -14,7 +14,6 @@ class Client:
         self.cache_path.mkdir(parents=True, exist_ok=True)
         self.file_metadata = self.load_metadata() # get clients file information
 
-
         self.coordinator_connection = CoordinatorConnection(coordinator_host, coordinator_port)
         self.id = self.get_client_id() # get or create client ID
 

@@ -106,7 +106,7 @@ class ChunkServer:
 
             self.chunk_path = Path.home() / '512_chunk_path'
             self.chunk_path.mkdir(parents=True, exist_ok=True)
-            chunk_file_path = self.chunk_path / f"{self.id[:6]}_{chunk_id}.bin"  # Use .bin for a viewable binary file
+            chunk_file_path = self.chunk_path / f"{str(self.id)[:6]}_{chunk_id}.bin"  # Use .bin for a viewable binary file
 
             # Write the binary chunk data to the file
             with open(chunk_file_path, "wb") as chunk_file:

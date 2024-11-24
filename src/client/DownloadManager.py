@@ -20,14 +20,9 @@ class DownloadManager:
 
     
     def download_file(self, file_id):
-        chunk_server_info = self.coordinator_connection.get_chunk_locations(file_id) # form [ {chunk_id:[{chnk_srv_addr, chnk_srv_port, chnk_srv_id,}, {replica_2}, {replica_3}], ...]
-        print('CHUNK SERVER INFO', chunk_server_info)
-        metadata_file = self.cache_path / f"{file_id}_metadata.json"
-        if not metadata_file.is_file():
-            print(f"Metadata file {metadata_file} does not exist.")
-            return False
-        with open(metadata_file, 'r') as f:
-            chunk_metadata = json.load(f)
+        chunk_server_info = self.coordinator_connection.get_chunk_locations(file_id) # form [file_id: file_id, chunks: [{chunk_id, chunk_index, chunk_server_locations],...]
+        print(chunk_server_info)
+        chunks = chunk_server_info['chunks']
 
 
         futures = []
@@ -35,24 +30,20 @@ class DownloadManager:
 
         # Set up parallel downloads
         with ThreadPoolExecutor() as executor:
-            for chunk_info in chunk_metadata:
-                chunk_id = chunk_info["chunk_id"]
-                chunk_index = chunk_info["chunk_index"]
-                chunk_server_id, chunk_server_addr, chunk_server_port = chunk_info['chunk_server_id'], chunk_info['chunk_server_addr'], chunk_info['chunk_server_port'] #just one server rn...will have to make it a list of servers in the future
-                server = {
-                    "chnk_srv_addr": chunk_server_addr,
-                    "chnk_srv_port": chunk_server_port,
-                    "chnk_srv_id": chunk_server_id
-                }
+            for chunk in chunks:
+                chunk_id = chunk["chunk_id"]
+                chunk_index = chunk["chunk_index"]
+                servers = chunk['chunk_server_locations']
                 # Only schedule a download if there are servers for the chunk
-                if server:
-                    # Attempt download from each server replica in order
-                    future = executor.submit(self.download_chunk_from_servers, chunk_id, chunk_index, [server])
+                if len(servers) > 0:
+                    # Attempt download from each server replica 
+                    future = executor.submit(self.download_chunk_from_servers, chunk_id, chunk_index, servers)
                     futures.append(future)
 
             # Process download results
             for future in as_completed(futures):
                 chunk_index, chunk_data = future.result()
+                print('\n chunk_index', chunk_index)
                 if chunk_data is not None:
                     downloaded_chunks[chunk_index] = chunk_data
                 else:

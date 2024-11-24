@@ -15,5 +15,3 @@ class ChunkServerAbstraction:
                             'chnk_srv_port': self.chnk_srv_port,
                             'chnk_srv_id': self.chnk_srv_id})
     
-
-    

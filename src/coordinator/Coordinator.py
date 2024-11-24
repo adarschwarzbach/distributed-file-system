@@ -10,14 +10,6 @@ import collections
 class Coordinator:
     def __init__(self, host='localhost', port=6000, max_workers=10):
 
-        ###   I THINK THIS COMMENTED STUFF IS ALL GARBAGE BELOW
-        # maps file_id to a File object
-        #self.file_map: Dict[int, File] = {}
-        # maps chunk_id to the 3 ChunkServers where we can find that chunk
-        #self.chunk_map: Dict[int, List[ChunkServer]] = {}
-        # set of ChunkServers that are online
-        #self.active_chunkservers: Set[ChunkServer] = set()
-
         # Networking & threading
         self.host = host
         self.port = port
@@ -29,7 +21,7 @@ class Coordinator:
         #ben's code
         self.chunk_server_map: Dict[int, ChunkServerAbstraction] = {} #map chunkserver id's to the address and port of the chunkserver
         self.chunk_map: Dict[int, List[int]] = collections.defaultdict(list) #map chunk ids to chunkserver id that hosts it --> WILL NEED TO CHANGE WHEN WE ADD REPLICATION BUT GOOD STARTING POINT
-        self.file_map: Dict[int, File] = {}
+        self.file_map: Dict[str, File] = {}
 
         self.file_to_chunk_to_server = {} # {file_id: [{chunk_id, chunk_index, [chunk_server(s)]}]}
 
@@ -82,7 +74,7 @@ class Coordinator:
             elif request.get("request_type") == "GET_CHUNK_SERVERS":
                 self.handle_getting_chunk_servers(request, client_socket)
             elif request.get("request_type") == "GET_FILE_DATA":
-                self.handle_get_file(client_socket)
+                self.handle_get_file(request, client_socket)
             else:
                 print(f"Unknown request type: {request.get('request_type')}")
 
@@ -96,10 +88,32 @@ class Coordinator:
             client_socket.close()  # Ensure the connection is closed
 
 
-    def handle_get_file(self, client_socket):
-        response_data = json.dumps(self.file_to_chunk_to_server) + '\n\n'
-        client_socket.sendall(response_data.encode())
-        print(f"Returned file servers to client")
+    def handle_get_file(self, request, client_socket):
+        try:
+            file_id = request.get('file_id')
+            file = self.file_map[file_id]
+            chunks = []
+            for chunk_id in file.chunks_to_index.keys():
+                chunk_servers = []
+                for chunk_server_id in self.chunk_map[chunk_id]:
+                    chunk_servers.append((json.loads(self.chunk_server_map[chunk_server_id].to_json()))) #appends json location of each chunk_server that holds the chunk
+                chunk = {
+                    'chunk_id': chunk_id,
+                    'chunk_index': file.get_index(chunk_id),
+                    'chunk_server_locations': chunk_servers
+                }
+                chunks.append(chunk)
+
+            response = {
+                'file_id': file_id,
+                'chunks': chunks
+            }
+
+            response_data = json.dumps(response) + '\n\n'
+            client_socket.sendall(response_data.encode())
+            print(f"Returned file servers to client")
+        except Exception as e:
+            print(f'Error getting the file data in coordinator: {e}')
 
 
     def handle_getting_chunk_servers(self, request, client_socket):
@@ -119,23 +133,20 @@ class Coordinator:
     def handle_creating_new_file(self, request):
         metadata = request.get('chunk_metadata')
         file_name = request.get('file_id')
-        # print('ran handle_creating_new_file')
-        self.file_to_chunk_to_server[file_name] = []
         new_file = File(file_name)
-        chunk_indexes_to_ids = {}
+        self.file_map[file_name] = new_file
         for obj in metadata:
             chunk_id, chunk_index, chunk_server_id = obj['chunk_id'], obj['chunk_index'], obj['chunk_server_id']
             self.chunk_map[chunk_id].append(chunk_server_id)
-            chunk_indexes_to_ids[chunk_index] = chunk_id
+            new_file.update_indexes(chunk_id, chunk_index) 
 
-            self.file_to_chunk_to_server[file_name].append({"chunk_id":chunk_id, "chunk_index":chunk_index, "server_info":self.chunk_server_map[chunk_server_id].to_json()})
+           
 
         print('\n\n\n')
        
 
 
-        new_file.chunks = chunk_indexes_to_ids
-        self.file_map[file_name] = new_file
+
         # print(self.file_map)
         # print(self.chunk_map)
 
