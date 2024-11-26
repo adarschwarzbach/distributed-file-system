@@ -24,7 +24,7 @@ class ChunkServer:
         self.coord_host = 'localhost'
         self.coord_port = 6000
 
-        self.known_chunk_servers = set()
+        self.known_chunk_servers = []
 
     def connect_to_coordinator(self):
         try:
@@ -55,7 +55,6 @@ class ChunkServer:
 
     def handle_request(self, client_socket):
         try:
-            # Buffer data until delimiter is detected
             data = ""
             while True:
                 part = client_socket.recv(1024).decode()
@@ -66,7 +65,6 @@ class ChunkServer:
                     data = data.replace("\n\n", "")
                     break
 
-            # Parse JSON request
             request = json.loads(data)
             print('request', request)
 
@@ -78,7 +76,7 @@ class ChunkServer:
                 self.download_chunk(chunk_id, client_socket)
 
             elif request.get("request_type") == "HEALTH_CHECK":
-                self.respond_health_check(client_socket)
+                self.respond_health_check(request, client_socket)
 
         except json.JSONDecodeError:
             print("Invalid JSON received")
@@ -142,18 +140,6 @@ class ChunkServer:
         except Exception as e:
             print(f"Error uploading chunk: {e}")
             client_socket.send(json.dumps({"status": "FAILURE", "error": str(e)}).encode())
-
-
-            #HAD THIS BEFORE I REALIZED I COULD UPDATE COORDINATE VIA CLIENT AFTER EVERYTHING
-            #notify coordinator that this specific chunk server stored a specific chunk for a specific file
-            #coordinator_notification = {
-            #    "request_type": "NOTIFY_COORDINATOR_OF_CHUNK_LOCATION",
-            #    'chunk_server_id': self.id,
-             #   "chunk_id": chunk_id,
-            #    'file_id': file_id
-            #    }
-           # self.coord_socket.sendall(json.dumps(coordinator_notification).encode())
-
             
 
     def download_chunk(self, chunk_id, client_socket):
@@ -170,18 +156,18 @@ class ChunkServer:
             client_socket.sendall(binary_data)
 
             print(f"Chunk with ID {chunk_id} sent successfully.")
-            #client_socket.send(json.dumps({"status": "SUCCESS", "chunk_id": chunk_id}).encode())
-
 
         except Exception as e:
             print(f"Error downloading chunk: {e}")
             client_socket.send(json.dumps({"status": "FAILURE", "error": str(e)}).encode()) 
         pass
     
-    def respond_health_check(self, client_socket):
+    def respond_health_check(self, request, client_socket):
         try:
+            print(f'{self.id} received heartbeat')
+            self.known_chunk_servers = request.get('other_active_servers')
             response = {"status": "OK"}
-            client_socket.sendall(json.dumps(response).encode())
+            client_socket.sendall((json.dumps(response) + '\n\n').encode())
         except Exception as e:
             print(f"Error sending health check response: {e}")
     
@@ -197,12 +183,12 @@ class ChunkServer:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.connect((other_chunk_server_addr, other_chunk_server_port))
                     s.sendall((json.dumps(chunk_server_req) + "\n\n").encode())
+                    print(f'Replicated {chunk_server_req["chunk_id"]} to other chunk server')
             except Exception as e:
                 print(f'Error replicate chunk: {e}')
 
     #Replicate a chunk by request of Coordinator
     def replicate_chunk_from_download(self, chunk_id, chnk_srv_addr, chnk_srv_port):
-        #replicate chunk to other ChunkServers
         try:
             #Download data to replicate
             file_path = self.chunk_map[chunk_id]
@@ -238,7 +224,7 @@ class ChunkServer:
                             data = data.replace("\n\n", "")
                             break
 
-                    response = json.loads(data)  # Parse JSON response
+                    response = json.loads(data) 
 
                     if response.get("status") == "SUCCESS":
                         print(f"Chunk ID {chunk_id} successfully uploaded to ChunkServer at {self.chnk_srv_port}:{self.chnk_srv_addr}")

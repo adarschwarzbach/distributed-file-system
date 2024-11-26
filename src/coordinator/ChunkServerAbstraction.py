@@ -15,3 +15,5 @@ class ChunkServerAbstraction:
                             'chnk_srv_port': self.chnk_srv_port,
                             'chnk_srv_id': self.chnk_srv_id})
     
+    def get_location(self):
+        return (self.chnk_srv_addr, self.chnk_srv_port)

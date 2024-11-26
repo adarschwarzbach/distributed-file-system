@@ -1,3 +1,4 @@
+import time
 from typing import Dict, Set, List
 from src.coordinator.File import File
 from src.coordinator.ChunkServerAbstraction import ChunkServerAbstraction
@@ -6,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import uuid 
 import json
 import collections
+import random
 
 class Coordinator:
     def __init__(self, host='localhost', port=6000, max_workers=10):
@@ -13,22 +15,18 @@ class Coordinator:
         # Networking & threading
         self.host = host
         self.port = port
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #IPv4 over TCP
-        self.server_socket.bind((self.host, self.port)) # Tells OS port is taken for incoming connections
-        self.server_socket.listen(5) # Up to 5 concurrent connections, after 5, requests are queued
-        self.executor = ThreadPoolExecutor(max_workers=max_workers) # create a managed thread pool
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(5) 
+        self.executor = ThreadPoolExecutor(max_workers=max_workers) 
 
-        #ben's code
         self.chunk_server_map: Dict[str, ChunkServerAbstraction] = {} #map chunkserver id's to the address and port of the chunkserver
-        self.chunk_map: Dict[int, List[str]] = collections.defaultdict(list) #map chunk ids to chunkserver id that hosts it --> WILL NEED TO CHANGE WHEN WE ADD REPLICATION BUT GOOD STARTING POINT
-        self.file_map: Dict[str, File] = {}
+        self.chunk_map: Dict[str, List[str]] = collections.defaultdict(list) #map chunk ids to chunkserver id that hosts it 
+        self.file_map: Dict[str, File] = {} #map file_id to File obj
 
-        self.file_to_chunk_to_server = {} # {file_id: [{chunk_id, chunk_index, [chunk_server(s)]}]}
 
     def start(self):
-        '''
-        Start the Coordinator
-        '''
+        self.executor.submit(self.send_heartbeat)
         while True:
             client_socket, addr = self.server_socket.accept()
             print(f"connected to {addr}")
@@ -38,30 +36,26 @@ class Coordinator:
 
     def handle_request(self, client_socket):
         try:
-            # Attempt to read a single message (small messages)
             data = client_socket.recv(1024).decode().strip()
 
-            # If data is empty, handle gracefully
             if not data:
                 print("Received empty request")
                 return
 
             try:
-                # Try parsing the single message as JSON
                 request = json.loads(data)
                 print(f"Received request: {request}")
             except json.JSONDecodeError:
-                # Fallback to buffered reading if JSON parsing fails
                 print("Incomplete or large message detected, switching to buffered reading")
                 while True:
                     part = client_socket.recv(1024).decode()
-                    if not part:  # Client closed connection
+                    if not part:  
                         break
                     data += part
                     if "\n\n" in data:
-                        data = data.replace("\n\n", "")  # Remove delimiter
+                        data = data.replace("\n\n", "")  
                         break
-                request = json.loads(data)  # Parse the complete buffered message
+                request = json.loads(data)  
                 print(f"Buffered request")
 
             # Dispatch request to the appropriate handler
@@ -87,7 +81,7 @@ class Coordinator:
             print(f"Error handling request: {e}")
 
         finally:
-            client_socket.close()  # Ensure the connection is closed
+            client_socket.close()  
 
 
     def handle_get_file(self, request, client_socket):
@@ -139,7 +133,6 @@ class Coordinator:
         self.file_map[file_name] = new_file
         for obj in metadata:
             chunk_id, chunk_index, chunk_server_id = obj['chunk_id'], obj['chunk_index'], obj['chunk_server_id']
-            #self.chunk_map[chunk_id].append(chunk_server_id)
             new_file.update_indexes(chunk_id, chunk_index) 
 
            
@@ -149,48 +142,65 @@ class Coordinator:
         self.chunk_map[chunk_id].append(chunk_server_id)
        
 
-
-
-        # print(self.file_map)
-        # print(self.chunk_map)
-
-        # file_id = request.get('file_id')
-        # chunk_metadata = request.get('chunk_metadata')
-        # chunk_ids = [chunk["chunk_id"] for chunk in chunk_metadata]
-
-        # #store file
-        # file = File(file_id, chunk_ids)
-        # self.file_map[file_id] = file
-
-        # #store where each chunk can be found
-        # for chunk in chunk_metadata:
-        #     chunk_id, chunk_server_id = chunk['chunk_id'], chunk['chunk_server_id']
-        #     self.chunk_map[chunk_id] = chunk_server_id
-
-
-
-
     def handle_get_client_id(self, client_socket):
         """Generate a new UUID client ID and send it back to client"""
-        #ToDo: Cache client and their ID somehow and write it to log
-
         client_id = str(uuid.uuid4())
         response = {"client_id": client_id}
         client_socket.sendall(json.dumps(response).encode())
         print(f"Generated and sent client ID: {client_id}")
 
 
-    def check_active_servers(self):
-        '''
-        go through self.active_chunkservers to see if any have gone offline unexpectedly
-        '''
-        pass
+    def send_heartbeat(self):
+        while True:
+            chunk_server_ids = list(self.chunk_server_map.keys())
+            print('\nHeartbeat sent')
+            for chunk_id in chunk_server_ids:
+                other_servers = [id_ for id_ in chunk_server_ids if id_ != chunk_id]
+                if len(other_servers) >= 2:
+                    assigned_servers_ids = random.sample(other_servers, 2)
+                else:
+                    assigned_servers_ids = other_servers  # Use whatever is available
+
+                assigned_servers = [self.chunk_server_map[assigned_server].get_location() for assigned_server in assigned_servers_ids]
+                request = {
+                    'request_type': 'HEALTH_CHECK',
+                    'other_active_servers': assigned_servers
+                }
+                try:
+                    chunk_server_addr, chunk_server_port = self.chunk_server_map[chunk_id].get_location()
+                    chunk_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    chunk_server_socket.connect((chunk_server_addr, chunk_server_port))
+                    chunk_server_socket.send((json.dumps(request) + '\n\n').encode())
+
+                    data = ""
+                    while True:
+                        part = chunk_server_socket.recv(1024).decode()
+                        if not part:  # Connection closed
+                            break
+                        data += part
+                        if "\n\n" in data:  # End of message
+                            data = data.replace("\n\n", "")  # Remove delimiter
+                            break
+
+                    response = json.loads(data)
+
+                    if response.get('status') != 'OK':
+                        self.handle_chunk_server_failure(chunk_id)
+
+                except Exception as e:
+                    self.handle_chunk_server_failure(chunk_id)
+                    print(f'A heartbeat has failed: {e}')
+
+            time.sleep(10)
+
+
 
     def handle_chunk_server_failure(self, failed_server):
         '''
         if a ChunkServer goes offline unexpectedly, map all the chunks it stored to another ChunkServer,
         call self.remap_chunk()
         '''
+        
         pass
 
     def handle_new_chunk_server(self, request):
@@ -208,12 +218,6 @@ class Coordinator:
         '''
         pass
     
-
-    def map_chunk_to_chunk_servers(self, chunk):
-        '''
-        map each new chunk to 3 chunkservers
-        '''
-        pass
 
     def remap_chunk(self, chunk):
         '''
