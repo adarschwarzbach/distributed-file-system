@@ -207,8 +207,7 @@ class Coordinator:
 
     def handle_chunk_server_failure(self, failed_server):
         '''
-        if a ChunkServer goes offline unexpectedly, map all the chunks it stored to another ChunkServer,
-        call self.remap_chunk()
+        if a ChunkServer goes offline, map all the chunks it stored to another ChunkServer
         '''
         print(f"Handling failure of chunk server {failed_server}")
         chunks_to_remap = list(self.server_chunks_map[failed_server])
@@ -225,14 +224,7 @@ class Coordinator:
         for chunk_id in chunks_to_remap:
             self.remap_chunk(chunk_id)
         pass
-
-    # def remove_chunk_server(self, server_to_remove):
-    #     '''
-    #     handle request for ChunkServer to leave
-    #     '''
-    #     pass
     
-
     def remap_chunk(self, chunk_id):
         '''
         remaps chunk to another ChunkServer, called when ChunkServer goes offline
@@ -268,14 +260,17 @@ class Coordinator:
                 data = ""
                 while True:
                     part = source_socket.recv(1024).decode()
-                    if not part or "\n\n" in part:
+                    if not part:
                         break
                     data += part
+                    if "\n\n" in data:
+                        data = data.replace("\n\n", "")
+                        break
             
             if data:
                 response = json.loads(data)
+                print(response)
                 if response.get("status") == "success":
-                    # Only update chunk_map after confirmed success
                     self.chunk_map[chunk_id].append(target_server_id)
                     print(f"Successfully remapped chunk {chunk_id} to server {target_server_id}")
                 else:
