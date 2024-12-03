@@ -24,6 +24,8 @@ class ChunkServer:
         self.coord_host = 'localhost'
         self.coord_port = 6000
 
+        self.known_chunk_servers = []
+
     def connect_to_coordinator(self):
         try:
             coord_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -53,7 +55,6 @@ class ChunkServer:
 
     def handle_request(self, client_socket):
         try:
-            # Buffer data until delimiter is detected
             data = ""
             while True:
                 part = client_socket.recv(1024).decode()
@@ -64,7 +65,6 @@ class ChunkServer:
                     data = data.replace("\n\n", "")
                     break
 
-            # Parse JSON request
             request = json.loads(data)
             print('request', request)
 
@@ -76,7 +76,15 @@ class ChunkServer:
                 self.download_chunk(chunk_id, client_socket)
 
             elif request.get("request_type") == "HEALTH_CHECK":
-                self.respond_health_check(client_socket)
+                self.respond_health_check(request, client_socket)
+
+            elif request.get("request_type") == "REPLICATE_CHUNK":
+                chunk_id = request.get('chunk_id')
+                self.replicate_chunk_from_download(
+                    chunk_id, 
+                    request.get('chnk_srv_addr'), 
+                    request.get('chnk_srv_port')
+                )
 
         except json.JSONDecodeError:
             print("Invalid JSON received")
@@ -90,6 +98,7 @@ class ChunkServer:
     
     def upload_chunk(self, request, client_socket):
         try:
+            #Upload chunk to memory
             chunk_id =  os.path.basename(request.get("chunk_id"))  # Ensure chunk_id is a simple identifier
             chunk_size = request.get("chunk_size")
             chunk_data_base64 = request.get("chunk_data")
@@ -101,7 +110,7 @@ class ChunkServer:
 
             print(f"Receiving chunk of chunk_id: {chunk_id} (Size: {chunk_size} bytes)")
 
-            self.chunk_path = Path.home() / '512_chunk_path'
+            self.chunk_path = Path.home() / '512_chunk_path' / f'{self.port} - {self.id}'
             self.chunk_path.mkdir(parents=True, exist_ok=True)
             chunk_file_path = self.chunk_path / f"{str(self.id)[:6]}_{chunk_id}.bin"  # Use .bin for a viewable binary file
 
@@ -113,6 +122,7 @@ class ChunkServer:
             print(f"Chunk for chunk_id {chunk_id} saved successfully at {chunk_file_path}.")
             client_socket.send(json.dumps({"status": "SUCCESS"}).encode())
 
+            #Notify Coordinator that we successfully uploaded a chunk
             coord_req = {
                 'request_type': 'CHUNK_UPLOAD_SUCCESS',
                 'chunk_id': chunk_id,
@@ -122,21 +132,22 @@ class ChunkServer:
             coord_socket.connect((self.coord_host, self.coord_port))
             coord_socket.send(json.dumps(coord_req).encode())
 
+            #OPTIONAL: Replicate Chunk to other ChunkServers
+            replicate = request.get('replicate')
+            if not replicate or replicate is None:
+                return
+            chunk_server_request = {
+                'request_type': 'UPLOAD_CHUNK',
+                'chunk_id': chunk_id,
+                'chunk_size': chunk_size,
+                'chunk_data': chunk_data_base64,
+                'replicate': False
+            }
+            self.replicate_chunk_on_upload(chunk_server_request)
+
         except Exception as e:
             print(f"Error uploading chunk: {e}")
             client_socket.send(json.dumps({"status": "FAILURE", "error": str(e)}).encode())
-
-
-            #HAD THIS BEFORE I REALIZED I COULD UPDATE COORDINATE VIA CLIENT AFTER EVERYTHING
-            #notify coordinator that this specific chunk server stored a specific chunk for a specific file
-            #coordinator_notification = {
-            #    "request_type": "NOTIFY_COORDINATOR_OF_CHUNK_LOCATION",
-            #    'chunk_server_id': self.id,
-             #   "chunk_id": chunk_id,
-            #    'file_id': file_id
-            #    }
-           # self.coord_socket.sendall(json.dumps(coordinator_notification).encode())
-
             
 
     def download_chunk(self, chunk_id, client_socket):
@@ -153,25 +164,43 @@ class ChunkServer:
             client_socket.sendall(binary_data)
 
             print(f"Chunk with ID {chunk_id} sent successfully.")
-            #client_socket.send(json.dumps({"status": "SUCCESS", "chunk_id": chunk_id}).encode())
-
 
         except Exception as e:
             print(f"Error downloading chunk: {e}")
             client_socket.send(json.dumps({"status": "FAILURE", "error": str(e)}).encode()) 
         pass
     
-    def respond_health_check(self, client_socket):
+    def respond_health_check(self, request, client_socket):
         try:
+            print(f'{self.id} received heartbeat')
+            self.known_chunk_servers = request.get('other_active_servers')
             response = {"status": "OK"}
-            client_socket.sendall(json.dumps(response).encode())
+            client_socket.sendall((json.dumps(response) + '\n\n').encode())
         except Exception as e:
             print(f"Error sending health check response: {e}")
     
-    def replicate_chunks(self, chunk_id, chnk_srv_addr, chnk_srv_port):
-        #replicate chunk to other ChunkServers
+
+    #Replicate chunk on upload to 2 other ChunkServers
+    def replicate_chunk_on_upload(self, chunk_server_req):
+        num_replications = 0
+        for other_chunk_server_addr, other_chunk_server_port in self.known_chunk_servers:
+            if num_replications >=2:
+                return
+            num_replications += 1
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((other_chunk_server_addr, other_chunk_server_port))
+                    s.sendall((json.dumps(chunk_server_req) + "\n\n").encode())
+                    print(f'Replicated {chunk_server_req["chunk_id"]} to other chunk server')
+            except Exception as e:
+                print(f'Error replicate chunk: {e}')
+
+    #Replicate a chunk by request of Coordinator
+    def replicate_chunk_from_download(self, chunk_id, chnk_srv_addr, chnk_srv_port):
         try:
+            #Download data to replicate
             file_path = self.chunk_map[chunk_id]
+            print(file_path, 'THIS IS FILE PATH')
             if not file_path or not os.path.exists(file_path):
                 raise ValueError(f"Chunk with ID {chunk_id} not found.")
 
@@ -180,6 +209,7 @@ class ChunkServer:
             with open(file_path, "rb") as chunk_file:
                 binary_data = chunk_file.read()
 
+            #Send downloaded data to ChunkServer
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.connect((chnk_srv_addr, chnk_srv_port))
                     chunk_data_base64 = base64.b64encode(binary_data).decode('utf-8')
@@ -188,7 +218,8 @@ class ChunkServer:
                         "request_type": "UPLOAD_CHUNK",
                         "chunk_id": chunk_id,
                         "chunk_size": len(binary_data),
-                        "chunk_data": chunk_data_base64
+                        "chunk_data": chunk_data_base64,
+                        'replicate': True
                     }
                     s.sendall((json.dumps(request) + "\n\n").encode())
 
@@ -202,10 +233,10 @@ class ChunkServer:
                             data = data.replace("\n\n", "")
                             break
 
-                    response = json.loads(data)  # Parse JSON response
+                    response = json.loads(data) 
 
                     if response.get("status") == "SUCCESS":
-                        print(f"Chunk ID {chunk_id} successfully uploaded to ChunkServer at {self.chnk_srv_port}:{self.chnk_srv_addr}")
+                        print(f"Chunk ID {chunk_id} successfully uploaded to ChunkServer at {chnk_srv_port}:{chnk_srv_addr}")
                         return True
                     elif response.get("status") == "FAILURE":
                         print(f"Server error during chunk upload for {chunk_id}. Retry attempt: Error: {response.get('error')}")
