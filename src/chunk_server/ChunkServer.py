@@ -110,7 +110,7 @@ class ChunkServer:
 
             print(f"Receiving chunk of chunk_id: {chunk_id} (Size: {chunk_size} bytes)")
 
-            self.chunk_path = Path.home() / '512_chunk_path' / f'{self.port} - {self.id}'
+            self.chunk_path = Path.home() / '512_chunk_path' / f'{self.id}'
             self.chunk_path.mkdir(parents=True, exist_ok=True)
             chunk_file_path = self.chunk_path / f"{str(self.id)[:6]}_{chunk_id}.bin"  # Use .bin for a viewable binary file
 
@@ -154,7 +154,17 @@ class ChunkServer:
         try:
             file_path = self.chunk_map[chunk_id]
             if not file_path or not os.path.exists(file_path):
-                raise ValueError(f"Chunk with ID {chunk_id} not found.")
+                prefixed_path = self.chunk_path / f"{str(self.id)[:6]}_{chunk_id}.bin"
+                if os.path.exists(prefixed_path):
+                    file_path = str(prefixed_path)
+                else: 
+                    print(f"Chunk file not found. Tried paths:\n- {file_path}\n- {prefixed_path}")
+                    response = {
+                        "status": "error",
+                        "error": f"Chunk {chunk_id} not found"
+                    }
+                    client_socket.sendall((json.dumps(response) + "\n\n").encode())
+                    return
 
             print(f"Sending chunk with ID {chunk_id} from {file_path}")
 
