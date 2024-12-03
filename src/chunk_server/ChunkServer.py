@@ -229,7 +229,7 @@ class ChunkServer:
                         "chunk_id": chunk_id,
                         "chunk_size": len(binary_data),
                         "chunk_data": chunk_data_base64,
-                        'replicate': True
+                        'replicate': False
                     }
                     s.sendall((json.dumps(request) + "\n\n").encode())
 

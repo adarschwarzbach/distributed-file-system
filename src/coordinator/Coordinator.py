@@ -23,6 +23,7 @@ class Coordinator:
         self.chunk_server_map: Dict[str, ChunkServerAbstraction] = {} #map chunkserver id's to the address and port of the chunkserver
         self.chunk_map: Dict[str, List[str]] = collections.defaultdict(list) #map chunk ids to chunkserver id that hosts it 
         self.file_map: Dict[str, File] = {} #map file_id to File obj
+        self.server_chunks_map: Dict[str, Set[str]] = collections.defaultdict(set) #map server id's to the chunks they host
 
 
     def start(self):
@@ -140,6 +141,7 @@ class Coordinator:
         chunk_id = request.get('chunk_id')
         chunk_server_id = request.get('chunk_server_id')
         self.chunk_map[chunk_id].append(chunk_server_id)
+        self.server_chunks_map[chunk_server_id].add(chunk_id)
        
 
     def handle_get_client_id(self, client_socket):
@@ -154,8 +156,8 @@ class Coordinator:
         while True:
             chunk_server_ids = list(self.chunk_server_map.keys())
             print('\nHeartbeat sent')
-            for chunk_id in chunk_server_ids:
-                other_servers = [id_ for id_ in chunk_server_ids if id_ != chunk_id]
+            for server_id in chunk_server_ids:
+                other_servers = [id_ for id_ in chunk_server_ids if id_ != server_id]
                 if len(other_servers) >= 2:
                     assigned_servers_ids = random.sample(other_servers, 2)
                 else:
@@ -167,7 +169,7 @@ class Coordinator:
                     'other_active_servers': assigned_servers
                 }
                 try:
-                    chunk_server_addr, chunk_server_port = self.chunk_server_map[chunk_id].get_location()
+                    chunk_server_addr, chunk_server_port = self.chunk_server_map[server_id].get_location()
                     chunk_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     chunk_server_socket.connect((chunk_server_addr, chunk_server_port))
                     chunk_server_socket.send((json.dumps(request) + '\n\n').encode())
@@ -185,11 +187,13 @@ class Coordinator:
                     response = json.loads(data)
 
                     if response.get('status') != 'OK':
-                        self.handle_chunk_server_failure(chunk_id)
+                        self.handle_chunk_server_failure(server_id)
 
                 except Exception as e:
-                    self.handle_chunk_server_failure(chunk_id)
-                    print(f'A heartbeat has failed: {e}')
+                    print(f'A heartbeat has failed for server {server_id}: {e}')
+                    self.handle_chunk_server_failure(server_id)
+                finally:
+                    chunk_server_socket.close()
 
             time.sleep(10)
 
@@ -207,18 +211,15 @@ class Coordinator:
         call self.remap_chunk()
         '''
         print(f"Handling failure of chunk server {failed_server}")
-        chunks_to_remap = []
+        chunks_to_remap = list(self.server_chunks_map[failed_server])
 
-        # Find all chunks hosted by the failed server
-        for chunk_id, servers in self.chunk_map.items():
-            if failed_server in servers:
-                chunks_to_remap.append(chunk_id)
-                self.chunk_map[chunk_id].remove(failed_server)  # Remove the failed server
-
-        print(self.chunk_map, 'UPDATED CHUNK MAP')
-        print(chunks_to_remap, 'chunks to remap')
-
+        for chunk_id in chunks_to_remap:
+            self.chunk_map[chunk_id].remove(failed_server)
+        
+        del self.server_chunks_map[failed_server]
         del self.chunk_server_map[failed_server]
+
+        print(chunks_to_remap, 'CHUNKS TO REMAP')
         
         # Remap each chunk to a new server
         for chunk_id in chunks_to_remap:
