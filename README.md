@@ -17,6 +17,19 @@ distributed-file-system/
 └── entry.py           # global entry 
 ```
 
+# Using the CLI To Run the DFS
+First, navigate to the 'distributed-file-system/' directory.
+
+## 1. Create an Instance of the Coordinator
+Run `python entry.py coordinator --port 6000`
+
+## 2. Create an Instance of the ChunkServer
+Run `python entry.py chunk_server --port {any available port...we recommend starting at 6001}`
+
+## 3. Create an Instance of the Client
+Run `python entry.py client`
+
+*NOTE:* For the DFS to work as intended, the Coordinator should be instantied first, and then 1+ instances of the ChunkServer, and then the Client
 
 # API Documentation
 

@@ -83,7 +83,8 @@ class ChunkServer:
                 self.replicate_chunk_from_download(
                     chunk_id, 
                     request.get('chnk_srv_addr'), 
-                    request.get('chnk_srv_port')
+                    request.get('chnk_srv_port'),
+                    client_socket
                 )
 
         except json.JSONDecodeError:
@@ -206,7 +207,7 @@ class ChunkServer:
                 print(f'Error replicate chunk: {e}')
 
     #Replicate a chunk by request of Coordinator
-    def replicate_chunk_from_download(self, chunk_id, chnk_srv_addr, chnk_srv_port):
+    def replicate_chunk_from_download(self, chunk_id, chnk_srv_addr, chnk_srv_port, client_socket):
         try:
             #Download data to replicate
             file_path = self.chunk_map[chunk_id]
@@ -229,7 +230,7 @@ class ChunkServer:
                         "chunk_id": chunk_id,
                         "chunk_size": len(binary_data),
                         "chunk_data": chunk_data_base64,
-                        'replicate': True
+                        'replicate': False
                     }
                     s.sendall((json.dumps(request) + "\n\n").encode())
 
@@ -247,13 +248,13 @@ class ChunkServer:
 
                     if response.get("status") == "SUCCESS":
                         print(f"Chunk ID {chunk_id} successfully uploaded to ChunkServer at {chnk_srv_port}:{chnk_srv_addr}")
+                        client_socket.send((json.dumps({"status": "success"}) + '\n\n').encode())
                         return True
                     elif response.get("status") == "FAILURE":
-                        print(f"Server error during chunk upload for {chunk_id}. Retry attempt: Error: {response.get('error')}")
-                        time.sleep(1.2)
+                        client_socket.send((json.dumps({"status": "error", "message": "Replication failed"}) + '\n\n').encode())
+                        print(f"Replication failed for {chunk_id}.")
 
         except Exception as e:
             print(f"Error downloading chunk: {e}")
-        
-        
-
+            client_socket.sendall((json.dumps({"status": "error", "message": str(e)}) + "\n\n").encode())
+            return False
